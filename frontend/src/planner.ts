@@ -327,6 +327,8 @@ export function draft(): RouteDraft {
 
 const legCache = new Map<string, RouteLeg>()
 let generation = 0
+/** The status text routing set last, so routing only ever clears its own messages. */
+let routingStatus: string | null = null
 let controller: AbortController | null = null
 
 const pointKey = (p: GeoPoint) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
@@ -369,12 +371,15 @@ async function recalculate() {
 
   const todo = keys.flatMap((_key, i) => (next[i]?.status === 'loading' ? [i] : []))
   if (todo.length === 0) {
-    // Nothing to calculate (e.g. undo to cached legs): drop a stale "Calculating…" or leg error.
-    if (status.value?.text === 'Calculating route…' || status.value?.kind === 'error') setStatus(null)
+    // Nothing to calculate (e.g. undo to cached legs): drop a stale "Calculating…" or leg error,
+    // but not messages from elsewhere (e.g. "route not found").
+    if (routingStatus !== null && status.value?.text === routingStatus) setStatus(null)
+    routingStatus = null
     return
   }
 
-  setStatus('Calculating route…')
+  routingStatus = 'Calculating route…'
+  setStatus(routingStatus)
   const worker = async () => {
     for (let i = todo.shift(); i !== undefined; i = todo.shift()) {
       const from = pts[i]
@@ -405,7 +410,8 @@ async function recalculate() {
   if (run !== generation) return
 
   const failed = legs.value.find((l) => l.status === 'error')
-  setStatus(failed?.status === 'error' ? failed.message : null, 'error')
+  routingStatus = failed?.status === 'error' ? failed.message : null
+  setStatus(routingStatus, 'error')
 }
 
 let preferenceTimer: ReturnType<typeof setTimeout> | undefined

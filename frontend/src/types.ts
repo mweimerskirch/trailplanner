@@ -74,6 +74,8 @@ export interface RouteSummary {
   editable: boolean
   /** Set while the route is in the trash. */
   deletedAt: string | null
+  /** Set while the route is archived (out of the main list, but kept). */
+  archivedAt: string | null
 }
 
 export interface RouteDetails {
@@ -92,6 +94,7 @@ export interface RouteDetails {
   source: RouteSource
   editable: boolean
   deletedAt: string | null
+  archivedAt: string | null
 }
 
 export interface FormatInfo {

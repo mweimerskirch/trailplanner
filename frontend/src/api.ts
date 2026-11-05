@@ -138,6 +138,18 @@ export const api = {
     await send(`/api/routes/${id}`, { method: 'DELETE' })
   },
 
+  listArchive() {
+    return json<RouteSummary[]>('/api/routes/archive')
+  },
+
+  archiveRoute(id: number) {
+    return json<RouteDetails>(`/api/routes/${id}/archive`, { method: 'POST' })
+  },
+
+  unarchiveRoute(id: number) {
+    return json<RouteDetails>(`/api/routes/${id}/archive`, { method: 'DELETE' })
+  },
+
   listTrash() {
     return json<RouteSummary[]>('/api/routes/trash')
   },

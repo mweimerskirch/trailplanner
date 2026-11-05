@@ -43,6 +43,22 @@ public class RouteController {
     return routes.list(user);
   }
 
+  @GetMapping("/routes/archive")
+  public List<RouteSummary> archive(CurrentUser user) {
+    return routes.archive(user);
+  }
+
+  /** Archives a route: out of the main list, but kept (unlike the trash, never emptied). */
+  @PostMapping("/routes/{id}/archive")
+  public RouteDetails archive(CurrentUser user, @PathVariable long id) {
+    return routes.setArchived(user, id, true).details();
+  }
+
+  @DeleteMapping("/routes/{id}/archive")
+  public RouteDetails unarchive(CurrentUser user, @PathVariable long id) {
+    return routes.setArchived(user, id, false).details();
+  }
+
   @GetMapping("/routes/trash")
   public List<RouteSummary> trash(CurrentUser user) {
     return routes.trash(user);

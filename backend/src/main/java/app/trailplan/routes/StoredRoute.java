@@ -26,7 +26,8 @@ public record StoredRoute(
     Instant updatedAt,
     RouteSource source,
     Optional<String> externalId,
-    Optional<Instant> deletedAt) {
+    Optional<Instant> deletedAt,
+    Optional<Instant> archivedAt) {
 
   public StoredRoute {
     waypoints = List.copyOf(waypoints);
@@ -52,6 +53,7 @@ public record StoredRoute(
         updatedAt,
         source,
         editable(),
-        deletedAt.orElse(null));
+        deletedAt.orElse(null),
+        archivedAt.orElse(null));
   }
 }

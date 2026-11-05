@@ -1,5 +1,7 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import { api } from '@/api'
 import ElevationChart from '@/components/ElevationChart.vue'
 import ExportPanel from '@/components/ExportPanel.vue'
 import LibraryShortcut from '@/components/LibraryShortcut.vue'
@@ -7,7 +9,42 @@ import MapView from '@/components/MapView.vue'
 import PlaceSearch from '@/components/PlaceSearch.vue'
 import PreferencesPanel from '@/components/PreferencesPanel.vue'
 import RouteStats from '@/components/RouteStats.vue'
-import { profile, status, viewOnly, waypoints } from '@/planner'
+import { openRoute, profile, routeId, setStatus, status, viewOnly, waypoints } from '@/planner'
+
+// ---------- URL <-> open route ----------
+// The address shows the open route (/routes/<id>), or '/' for a new one, so it can be bookmarked,
+// reloaded and used with the back button. The page stays alive while the library is open, so
+// both directions only act while the planner is the current page.
+
+const route = useRoute()
+const router = useRouter()
+const onPlanner = () => route.name === 'planner' || route.name === 'route'
+
+async function openFromUrl(id: number) {
+  if (routeId.value === id) return
+  try {
+    openRoute(await api.getRoute(id))
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Could not open the route.', 'error')
+    await router.replace('/')
+  }
+}
+
+watch(
+  () => [route.name, route.params.id],
+  () => {
+    if (route.name === 'route') void openFromUrl(Number(route.params.id))
+    else if (route.name === 'planner' && routeId.value !== null)
+      void router.replace(`/routes/${String(routeId.value)}`)
+  },
+  { immediate: true },
+)
+
+watch(routeId, (id) => {
+  if (!onPlanner()) return
+  const target = id === null ? '/' : `/routes/${String(id)}`
+  if (route.path !== target) void router.replace(target)
+})
 
 const hint = computed(() => {
   if (viewOnly.value) return ''

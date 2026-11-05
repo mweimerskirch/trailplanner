@@ -107,7 +107,9 @@ public class DatabaseMigrations implements InitializingBean {
               FROM wahoo_token
               """,
               "DROP TABLE wahoo_token",
-              "ALTER TABLE wahoo_token_new RENAME TO wahoo_token"));
+              "ALTER TABLE wahoo_token_new RENAME TO wahoo_token"),
+          // 5: archive: routes the rider no longer wants in the main list, without deleting them
+          List.of("ALTER TABLE route ADD COLUMN archived_at TEXT"));
 
   private final JdbcClient jdbc;
   private final TransactionTemplate transactions;

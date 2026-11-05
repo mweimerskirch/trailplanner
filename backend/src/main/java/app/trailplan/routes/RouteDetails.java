@@ -24,4 +24,5 @@ public record RouteDetails(
     Instant updatedAt,
     RouteSource source,
     boolean editable,
-    Instant deletedAt) {}
+    Instant deletedAt,
+    Instant archivedAt) {}

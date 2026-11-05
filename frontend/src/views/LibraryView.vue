@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import ImportDialog from '@/components/ImportDialog.vue'
 import * as planner from '@/planner'
@@ -17,8 +17,20 @@ type Sort = 'updated' | 'name' | 'distance' | 'ascent'
 type SourceFilter = 'all' | 'planned' | 'imported'
 
 const router = useRouter()
-const tab = ref<'library' | 'trash'>('library')
+const route = useRoute()
+
+type Tab = 'library' | 'archive' | 'trash'
+/** The tab is part of the address: /library, /library/archived, /library/trash. */
+const tab = computed<Tab>(() => {
+  const param = route.params.tab
+  return param === 'archived' ? 'archive' : param === 'trash' ? 'trash' : 'library'
+})
+function setTab(next: Tab) {
+  const path = { library: '/library', archive: '/library/archived', trash: '/library/trash' }[next]
+  if (route.path !== path) void router.push(path)
+}
 const routes = ref<RouteSummary[]>([])
+const archived = ref<RouteSummary[]>([])
 const trash = ref<RouteSummary[]>([])
 const loading = ref(true)
 const failed = ref(false)
@@ -49,8 +61,13 @@ const visible = computed(() => {
 
 async function load() {
   try {
-    const [active, trashed] = await Promise.all([api.listRoutes(), api.listTrash()])
+    const [active, archivedRoutes, trashed] = await Promise.all([
+      api.listRoutes(),
+      api.listArchive(),
+      api.listTrash(),
+    ])
     routes.value = active
+    archived.value = archivedRoutes
     trash.value = trashed
     failed.value = false
   } catch {
@@ -71,7 +88,7 @@ async function act(task: () => Promise<void>, failure: string) {
 const open = (id: number) =>
   act(async () => {
     planner.openRoute(await api.getRoute(id))
-    await router.push('/')
+    await router.push(`/routes/${String(id)}`)
   }, 'Could not open the route.')
 
 async function startRename(route: RouteSummary) {
@@ -114,6 +131,20 @@ const download = (route: RouteSummary) =>
     }, 2000)
   }, 'Could not download the route.')
 
+const archive = (route: RouteSummary) =>
+  act(async () => {
+    await api.archiveRoute(route.id)
+    planner.setStatus(`Archived “${route.name}”. Find it under Archived.`, 'info', 3000)
+    planner.libraryVersion.value++
+  }, 'Could not archive the route.')
+
+const unarchive = (route: RouteSummary) =>
+  act(async () => {
+    await api.unarchiveRoute(route.id)
+    planner.setStatus(`“${route.name}” is back in your routes.`, 'info', 2500)
+    planner.libraryVersion.value++
+  }, 'Could not unarchive the route.')
+
 const moveToTrash = (route: RouteSummary) =>
   act(async () => {
     await api.deleteRoute(route.id)
@@ -144,7 +175,7 @@ const emptyTrash = () =>
     }
     await api.emptyTrash()
     planner.libraryVersion.value++
-    tab.value = 'library'
+    setTab('library')
   }, 'Could not empty the trash.')
 
 function onImported(openId: number | null) {
@@ -169,16 +200,25 @@ watch(planner.libraryVersion, load)
             role="tab"
             :aria-selected="tab === 'library'"
             :class="{ active: tab === 'library' }"
-            @click="tab = 'library'"
+            @click="setTab('library')"
           >
             Routes<span class="count">{{ routes.length }}</span>
           </button>
           <button
             type="button"
             role="tab"
+            :aria-selected="tab === 'archive'"
+            :class="{ active: tab === 'archive' }"
+            @click="setTab('archive')"
+          >
+            Archived<span class="count">{{ archived.length }}</span>
+          </button>
+          <button
+            type="button"
+            role="tab"
             :aria-selected="tab === 'trash'"
             :class="{ active: tab === 'trash' }"
-            @click="tab = 'trash'"
+            @click="setTab('trash')"
           >
             Trash<span class="count">{{ trash.length }}</span>
           </button>
@@ -284,6 +324,55 @@ watch(planner.libraryVersion, load)
                 >
                   ⧉
                 </button>
+                <button type="button" title="Archive" :aria-label="`Archive ${r.name}`" @click="archive(r)">
+                  Archive
+                </button>
+                <button
+                  type="button"
+                  title="Move to trash"
+                  :aria-label="`Move ${r.name} to the trash`"
+                  @click="moveToTrash(r)"
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </template>
+
+      <template v-else-if="tab === 'archive'">
+        <p class="empty">
+          Routes you no longer want in your list, kept for good. The trash never touches them.
+        </p>
+        <table v-if="archived.length" class="routes">
+          <thead>
+            <tr>
+              <th scope="col">Name</th>
+              <th scope="col" class="num">Distance</th>
+              <th scope="col" class="num">Climbing</th>
+              <th scope="col" class="hide-narrow">Archived</th>
+              <th scope="col"><span class="visually-hidden">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in archived" :key="r.id">
+              <td class="name-cell">
+                <button
+                  type="button"
+                  class="name"
+                  :title="`Open ${r.name} in the planner`"
+                  @click="open(r.id)"
+                >
+                  {{ r.name }}
+                </button>
+              </td>
+              <td class="num">{{ km(r.distance) }} km</td>
+              <td class="num">{{ Math.round(r.ascent) }} m</td>
+              <td class="hide-narrow">{{ day(r.archivedAt) }}</td>
+              <td class="actions">
+                <button type="button" @click="open(r.id)">Open</button>
+                <button type="button" @click="unarchive(r)">Unarchive</button>
                 <button
                   type="button"
                   title="Move to trash"

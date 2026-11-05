@@ -33,6 +33,18 @@ public class RouteService {
     return repository.findActiveSummaries(user.id());
   }
 
+  public List<RouteSummary> archive(CurrentUser user) {
+    return repository.findArchivedSummaries(user.id());
+  }
+
+  /** Archives the route (or takes it out of the archive); it is never deleted by this. */
+  public StoredRoute setArchived(CurrentUser user, long id, boolean archived) {
+    if (!repository.setArchived(user.id(), id, archived ? clock.instant() : null)) {
+      throw new RouteNotFoundException(id);
+    }
+    return get(user, id);
+  }
+
   public List<RouteSummary> trash(CurrentUser user) {
     return repository.findTrashedSummaries(user.id());
   }

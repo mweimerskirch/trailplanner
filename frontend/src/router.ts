@@ -9,8 +9,11 @@ export const router = createRouter({
   history: createWebHistory(),
   routes: [
     { path: '/riders', name: 'riders', component: RidersView },
+    // The planner: '/' for a new route, '/routes/<id>' while a saved route is open.
     { path: '/', name: 'planner', component: PlannerView },
-    { path: '/library', name: 'library', component: LibraryView },
+    { path: '/routes/:id(\\d+)', name: 'route', component: PlannerView },
+    // The library: '/library', '/library/archived' or '/library/trash'.
+    { path: '/library/:tab(archived|trash)?', name: 'library', component: LibraryView },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

@@ -30,7 +30,7 @@ public class RouteRepository {
 
   private static final String SUMMARY_COLUMNS =
       """
-      id, name, distance_m, ascent_m, updated_at, source, deleted_at,
+      id, name, distance_m, ascent_m, updated_at, source, deleted_at, archived_at,
       waypoints_json <> '[]' AS editable
       """;
 
@@ -42,15 +42,38 @@ public class RouteRepository {
     this.json = json;
   }
 
-  /** Routes in the library, most recently changed first. */
+  /** Routes in the library (not archived, not in the trash), most recently changed first. */
   public List<RouteSummary> findActiveSummaries(long userId) {
     return jdbc.sql(
             "SELECT "
                 + SUMMARY_COLUMNS
-                + " FROM route WHERE user_id = :user AND deleted_at IS NULL ORDER BY updated_at DESC")
+                + " FROM route WHERE user_id = :user AND deleted_at IS NULL AND archived_at IS NULL"
+                + " ORDER BY updated_at DESC")
         .param("user", userId)
         .query(RouteRepository::mapSummary)
         .list();
+  }
+
+  /** Archived routes (not in the trash), most recently archived first. */
+  public List<RouteSummary> findArchivedSummaries(long userId) {
+    return jdbc.sql(
+            "SELECT "
+                + SUMMARY_COLUMNS
+                + " FROM route WHERE user_id = :user AND deleted_at IS NULL"
+                + " AND archived_at IS NOT NULL ORDER BY archived_at DESC")
+        .param("user", userId)
+        .query(RouteRepository::mapSummary)
+        .list();
+  }
+
+  /** Archives or unarchives a route. False if it does not exist. */
+  public boolean setArchived(long userId, long id, Instant archivedAt) {
+    return jdbc.sql("UPDATE route SET archived_at = :at WHERE id = :id AND user_id = :user")
+            .param("id", id)
+            .param("user", userId)
+            .param("at", archivedAt == null ? null : archivedAt.toString())
+            .update()
+        == 1;
   }
 
   /** Routes in the trash, most recently deleted first. */
@@ -276,7 +299,8 @@ public class RouteRepository {
         Instant.parse(rs.getString("updated_at")),
         RouteSource.valueOf(rs.getString("source")),
         rs.getBoolean("editable"),
-        instantOrNull(rs, "deleted_at"));
+        instantOrNull(rs, "deleted_at"),
+        instantOrNull(rs, "archived_at"));
   }
 
   private StoredRoute map(ResultSet rs, int row) throws SQLException {
@@ -293,7 +317,8 @@ public class RouteRepository {
         Instant.parse(rs.getString("updated_at")),
         RouteSource.valueOf(rs.getString("source")),
         Optional.ofNullable(rs.getString("external_id")),
-        Optional.ofNullable(instantOrNull(rs, "deleted_at")));
+        Optional.ofNullable(instantOrNull(rs, "deleted_at")),
+        Optional.ofNullable(instantOrNull(rs, "archived_at")));
   }
 
   private static long generatedId(KeyHolder keys) {

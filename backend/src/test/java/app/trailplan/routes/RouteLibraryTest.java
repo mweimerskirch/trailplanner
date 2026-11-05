@@ -137,4 +137,30 @@ class RouteLibraryTest {
     assertThat(http.send("PATCH", "/api/routes/999999", "{\"name\":\"x\"}").statusCode())
         .isEqualTo(404);
   }
+
+  @Test
+  void archivedRoutesLeaveTheListButAreKept() throws Exception {
+    long kept = plannedRoute("Kept");
+    long old = plannedRoute("Old favourite");
+
+    assertThat(http.send("POST", "/api/routes/" + old + "/archive", null).body())
+        .contains("\"archivedAt\":\"");
+    assertThat(http.get("/api/routes").body()).contains("Kept").doesNotContain("Old favourite");
+    assertThat(http.get("/api/routes/archive").body())
+        .contains("\"name\":\"Old favourite\"")
+        .doesNotContain("Kept");
+    // Still a normal route: it can be opened and exported.
+    assertThat(http.get("/api/routes/" + old).statusCode()).isEqualTo(200);
+
+    // Emptying the trash never touches the archive.
+    http.send("DELETE", "/api/routes/" + kept, null);
+    http.send("DELETE", "/api/routes/trash", null);
+    assertThat(http.get("/api/routes/archive").body()).contains("Old favourite");
+
+    assertThat(http.send("DELETE", "/api/routes/" + old + "/archive", null).body())
+        .contains("\"archivedAt\":null");
+    assertThat(http.get("/api/routes").body()).contains("Old favourite");
+    assertThat(http.get("/api/routes/archive").body()).isEqualTo("[]");
+    assertThat(http.send("POST", "/api/routes/999999/archive", null).statusCode()).isEqualTo(404);
+  }
 }

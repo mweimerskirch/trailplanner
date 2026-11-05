@@ -1,9 +1,15 @@
 <script setup lang="ts">
-import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
+import { routeId } from '@/planner'
 import { currentRider } from '@/session'
 
 const route = useRoute()
+/** "Planner" goes back to the open route, if any, not to an empty planner. */
+const plannerLink = computed(() => (routeId.value === null ? '/' : `/routes/${String(routeId.value)}`))
+const section = computed(() =>
+  route.name === 'library' ? 'library' : route.name === 'riders' ? 'riders' : 'planner',
+)
 const menuOpen = ref(false)
 const menu = useTemplateRef<HTMLElement>('menu')
 
@@ -51,8 +57,8 @@ const initial = (name: string) => name.charAt(0).toLocaleUpperCase()
 
     <template v-if="currentRider">
       <nav class="main" aria-label="Main">
-        <RouterLink to="/">Planner</RouterLink>
-        <RouterLink to="/library">Library</RouterLink>
+        <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">Planner</RouterLink>
+        <RouterLink to="/library" :class="{ current: section === 'library' }">Library</RouterLink>
       </nav>
 
       <div ref="menu" class="rider-menu">
@@ -128,7 +134,7 @@ const initial = (name: string) => name.charAt(0).toLocaleUpperCase()
 .main a:hover {
   color: var(--ink);
 }
-.main a.router-link-exact-active {
+.main a.current {
   color: var(--ink);
   border-bottom-color: var(--moss);
 }
