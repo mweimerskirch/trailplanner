@@ -1,0 +1,38 @@
+# Trailplan: BRouter (routing) + Spring Boot (API, SQLite) + nginx (Vue app, /api proxy).
+# First run: ./scripts/download-segments.sh, then: docker compose up -d --build
+# Open http://localhost:8080
+
+services:
+  brouter:
+    build: ./brouter
+    volumes:
+      - ./data/segments4:/segments4:ro
+      - ./data/customprofiles:/customprofiles:ro
+    ports:
+      - "127.0.0.1:17777:17777" # only for running the backend outside Docker during development
+    restart: unless-stopped
+
+  backend:
+    build: ./backend
+    environment:
+      BROUTER_URL: http://brouter:17777
+      BROUTER_CUSTOM_PROFILE_DIR: /customprofiles
+      TRAILPLAN_DB: /data/trailplan.db
+      TRAILPLAN_PUBLIC_URL: ${TRAILPLAN_PUBLIC_URL:-http://localhost:8080}
+      WAHOO_ENABLED: ${WAHOO_ENABLED:-false}
+      WAHOO_CLIENT_ID: ${WAHOO_CLIENT_ID:-}
+      WAHOO_CLIENT_SECRET: ${WAHOO_CLIENT_SECRET:-}
+    volumes:
+      - ./data/db:/data
+      - ./data/customprofiles:/customprofiles
+    depends_on:
+      - brouter
+    restart: unless-stopped
+
+  web:
+    build: ./frontend
+    ports:
+      - "${TRAILPLAN_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

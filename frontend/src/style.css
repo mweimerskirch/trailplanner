@@ -1,0 +1,236 @@
+:root {
+  --bg: #e9ede7;
+  --panel: #f7f9f5;
+  --ink: #1c2620;
+  --muted: #5b685f;
+  --line: #d3dad1;
+  --moss: #2f5e3b;
+  --moss-ink: #ffffff;
+  --route: #c2186b;
+  --field: #ffffff;
+  --warn: #b3261e;
+  --shadow: 0 2px 10px rgb(0 0 0 / 18%);
+  --font-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --font-display: 'Barlow Condensed', 'Arial Narrow', system-ui, sans-serif;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #101511;
+    --panel: #171e19;
+    --ink: #e2e8e1;
+    --muted: #95a298;
+    --line: #2a342d;
+    --moss: #82b88e;
+    --moss-ink: #0f1a12;
+    --route: #ff4fa3;
+    --field: #202923;
+    --warn: #ff8a80;
+    --shadow: 0 2px 10px rgb(0 0 0 / 50%);
+    color-scheme: dark;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.45;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+#app {
+  display: grid;
+  grid-template-columns: 370px 1fr;
+}
+
+@media (max-width: 820px) {
+  html,
+  body,
+  #app {
+    height: auto;
+  }
+  #app {
+    grid-template-columns: 1fr;
+  }
+}
+
+h2 {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 19px;
+  margin: 26px 0 10px;
+}
+
+button,
+input,
+select,
+.button {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='text'],
+input[type='search'],
+input[type='number'],
+select {
+  width: 100%;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+
+button,
+.button {
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 7px 12px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+
+button:hover:not(:disabled),
+.button:hover {
+  border-color: var(--muted);
+}
+
+button.primary {
+  background: var(--moss);
+  color: var(--moss-ink);
+  border-color: var(--moss);
+  font-weight: 600;
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+button.link {
+  border: none;
+  background: none;
+  padding: 0;
+  text-decoration: underline;
+}
+
+:focus-visible {
+  outline: 2px solid var(--route);
+  outline-offset: 2px;
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.row > button,
+.row > .button {
+  flex: 1 1 auto;
+  text-align: center;
+}
+
+.field {
+  margin-bottom: 12px;
+}
+
+.field > label {
+  display: block;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.field.check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.field.check > label {
+  margin: 0;
+}
+
+.empty {
+  color: var(--muted);
+  font-size: 14px;
+  margin: 6px 0;
+}
+
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+code {
+  font-size: 0.92em;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* Waypoint markers (created in MapView.vue, outside Vue's scoped styles) */
+.wp {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--route);
+  display: grid;
+  place-items: center;
+  font: 600 12px/1 var(--font-body);
+  color: #1c2620;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+  cursor: grab;
+}
+
+.wp-start {
+  background: #2f5e3b;
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.wp-end {
+  background: var(--route);
+  border-color: #ffffff;
+  color: #ffffff;
+}
+
+.wp-ghost {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ffffff;
+  border: 3px solid var(--route);
+  pointer-events: none;
+}
+
+.maplibregl-popup-content {
+  font-family: var(--font-body);
+  color: #1c2620;
+}
+
+.popup-button {
+  margin-top: 6px;
+}

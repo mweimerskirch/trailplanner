@@ -1,0 +1,20 @@
+import pluginVue from 'eslint-plugin-vue'
+import { defineConfigWithVueTs, vueTsConfigs } from '@vue/eslint-config-typescript'
+import skipFormatting from '@vue/eslint-config-prettier/skip-formatting'
+
+export default defineConfigWithVueTs(
+  { name: 'app/files', files: ['**/*.{ts,mts,vue}'] },
+  { name: 'app/ignores', ignores: ['dist/**', 'node_modules/**'] },
+  pluginVue.configs['flat/recommended'],
+  vueTsConfigs.strictTypeChecked,
+  vueTsConfigs.stylisticTypeChecked,
+  {
+    name: 'app/rules',
+    rules: {
+      'vue/multi-word-component-names': 'off',
+      '@typescript-eslint/restrict-template-expressions': ['error', { allowNumber: true }],
+    },
+  },
+  // Formatting is Prettier's job (`npm run format`); turn off conflicting style rules.
+  skipFormatting,
+)
