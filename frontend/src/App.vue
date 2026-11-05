@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
-import AppHeader from './components/AppHeader.vue'
+import AppHeader from './components/organisms/AppHeader.vue'
 import { setStatus } from './planner'
 
 onMounted(() => {
@@ -20,7 +20,7 @@ onMounted(() => {
     <div class="page">
       <!-- The planner stays alive while the library is open, so the map and routing state survive. -->
       <RouterView v-slot="{ Component }">
-        <KeepAlive include="PlannerView">
+        <KeepAlive include="PlannerPage">
           <component :is="Component" />
         </KeepAlive>
       </RouterView>

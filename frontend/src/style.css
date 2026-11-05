@@ -233,6 +233,15 @@ code {
   margin-top: 6px;
 }
 
+/* Waypoints always stack above warning markers, so they can be dragged even where both meet. */
+.maplibregl-marker.wp {
+  z-index: 2;
+}
+
+.maplibregl-marker.route-warning {
+  z-index: 1;
+}
+
 /* Closed or restricted way on a forced leg (MapView warning markers). */
 .route-warning {
   width: 22px;

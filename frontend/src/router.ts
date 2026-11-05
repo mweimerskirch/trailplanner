@@ -1,19 +1,19 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import { onNoRider } from './api'
 import { currentRider, forgetRider, loadSession } from './session'
-import LibraryView from './views/LibraryView.vue'
-import PlannerView from './views/PlannerView.vue'
-import RidersView from './views/RidersView.vue'
+import LibraryPage from './pages/LibraryPage.vue'
+import PlannerPage from './pages/PlannerPage.vue'
+import RidersPage from './pages/RidersPage.vue'
 
 export const router = createRouter({
   history: createWebHistory(),
   routes: [
-    { path: '/riders', name: 'riders', component: RidersView },
+    { path: '/riders', name: 'riders', component: RidersPage },
     // The planner: '/' for a new route, '/routes/<id>' while a saved route is open.
-    { path: '/', name: 'planner', component: PlannerView },
-    { path: '/routes/:id(\\d+)', name: 'route', component: PlannerView },
+    { path: '/', name: 'planner', component: PlannerPage },
+    { path: '/routes/:id(\\d+)', name: 'route', component: PlannerPage },
     // The library: '/library', '/library/archived' or '/library/trash'.
-    { path: '/library/:tab(archived|trash)?', name: 'library', component: LibraryView },
+    { path: '/library/:tab(archived|trash)?', name: 'library', component: LibraryPage },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

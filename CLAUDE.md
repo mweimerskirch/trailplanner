@@ -32,6 +32,16 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
   `MTB_SCALE_VALUES` in `BRouterProfileGenerator` when upgrading BRouter.
 
+## Frontend structure
+
+Vue components follow atomic design, one folder per level in `frontend/src/components/`:
+`atoms/` (AppLogo, Avatar, Badge, IconButton), `molecules/` (TabBar, StatusMessage, StatTile,
+WarningList, RiderMenu, BreakdownBar, PlaceSearch), `organisms/` (AppHeader, MapView,
+ElevationChart, RouteStats, ExportPanel, ImportDialog, LibraryShortcut, PreferencesPanel) and
+`templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.
+A component may only use components from its own level or below. Shared state is in `planner.ts`
+and `session.ts`, not in components.
+
 ## Plugin points
 
 - Devices: implement `devices.DeviceIntegration` as a Spring bean (`@Order` sets its position).

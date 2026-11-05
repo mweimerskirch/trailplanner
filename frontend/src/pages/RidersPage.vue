@@ -2,6 +2,8 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
+import Avatar from '@/components/atoms/Avatar.vue'
+import CenteredLayout from '@/components/templates/CenteredLayout.vue'
 import { chooseRider, currentRider, forgetRider, loadSession } from '@/session'
 import type { RiderSummary } from '@/types'
 
@@ -105,92 +107,75 @@ onMounted(async () => {
 </script>
 
 <template>
-  <main class="riders-page">
-    <div class="card">
-      <h1>Who's planning?</h1>
-      <p class="sub">Pick your name to open your library.</p>
+  <CenteredLayout>
+    <h1>Who's planning?</h1>
+    <p class="sub">Pick your name to open your library.</p>
 
-      <p v-if="loading" class="empty">Loading…</p>
-      <ul v-else-if="riders.length" class="riders">
-        <li v-for="r in riders" :key="r.id">
-          <template v-if="renamingId === r.id">
-            <input
-              ref="renameInput"
-              v-model="renameText"
-              type="text"
-              maxlength="60"
-              aria-label="New name"
-              @keydown.enter.prevent="finishRename(r)"
-              @keydown.esc.prevent="renamingId = null"
-              @blur="finishRename(r)"
-            />
-          </template>
-          <button
-            v-else
-            type="button"
-            class="rider"
-            :class="{ current: currentRider?.id === r.id }"
-            :disabled="managing"
-            @click="pick(r)"
-          >
-            <span class="avatar" aria-hidden="true">{{ r.name.charAt(0).toLocaleUpperCase() }}</span>
-            <span class="who">
-              <span class="name">{{ r.name }}</span>
-              <span class="meta">{{ r.routes === 1 ? '1 route' : `${r.routes} routes` }}</span>
-            </span>
-          </button>
-          <span v-if="managing && renamingId !== r.id" class="manage">
-            <button type="button" :aria-label="`Rename ${r.name}`" @click="startRename(r)">Rename</button>
-            <button type="button" class="danger" :aria-label="`Delete ${r.name}`" @click="remove(r)">
-              Delete
-            </button>
-          </span>
-        </li>
-      </ul>
-
-      <form class="add" @submit.prevent="add">
-        <label for="new-rider">{{ riders.length ? 'Add a rider' : 'Add the first rider' }}</label>
-        <div class="row">
+    <p v-if="loading" class="empty">Loading…</p>
+    <ul v-else-if="riders.length" class="riders">
+      <li v-for="r in riders" :key="r.id">
+        <template v-if="renamingId === r.id">
           <input
-            id="new-rider"
-            v-model="newName"
+            ref="renameInput"
+            v-model="renameText"
             type="text"
             maxlength="60"
-            placeholder="Name"
-            autocomplete="off"
+            aria-label="New name"
+            @keydown.enter.prevent="finishRename(r)"
+            @keydown.esc.prevent="renamingId = null"
+            @blur="finishRename(r)"
           />
-          <button type="submit" class="primary" :disabled="!newName.trim()">Add</button>
-        </div>
-      </form>
-
-      <p v-if="error" class="error" role="alert">{{ error }}</p>
-
-      <div class="foot">
-        <button v-if="riders.length" type="button" class="link" @click="managing = !managing">
-          {{ managing ? 'Done' : 'Manage riders' }}
+        </template>
+        <button
+          v-else
+          type="button"
+          class="rider"
+          :class="{ current: currentRider?.id === r.id }"
+          :disabled="managing"
+          @click="pick(r)"
+        >
+          <Avatar :name="r.name" size="lg" />
+          <span class="who">
+            <span class="name">{{ r.name }}</span>
+            <span class="meta">{{ r.routes === 1 ? '1 route' : `${r.routes} routes` }}</span>
+          </span>
         </button>
-        <span class="note">No passwords: everyone on this network can open every library.</span>
+        <span v-if="managing && renamingId !== r.id" class="manage">
+          <button type="button" :aria-label="`Rename ${r.name}`" @click="startRename(r)">Rename</button>
+          <button type="button" class="danger" :aria-label="`Delete ${r.name}`" @click="remove(r)">
+            Delete
+          </button>
+        </span>
+      </li>
+    </ul>
+
+    <form class="add" @submit.prevent="add">
+      <label for="new-rider">{{ riders.length ? 'Add a rider' : 'Add the first rider' }}</label>
+      <div class="row">
+        <input
+          id="new-rider"
+          v-model="newName"
+          type="text"
+          maxlength="60"
+          placeholder="Name"
+          autocomplete="off"
+        />
+        <button type="submit" class="primary" :disabled="!newName.trim()">Add</button>
       </div>
+    </form>
+
+    <p v-if="error" class="error" role="alert">{{ error }}</p>
+
+    <div class="foot">
+      <button v-if="riders.length" type="button" class="link" @click="managing = !managing">
+        {{ managing ? 'Done' : 'Manage riders' }}
+      </button>
+      <span class="note">No passwords: everyone on this network can open every library.</span>
     </div>
-  </main>
+  </CenteredLayout>
 </template>
 
 <style scoped>
-.riders-page {
-  min-height: 100%;
-  display: grid;
-  place-items: center;
-  padding: 24px 12px;
-  background: var(--bg);
-}
-.card {
-  width: min(460px, 100%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  box-shadow: var(--shadow);
-  padding: 26px 26px 20px;
-}
 h1 {
   font-family: var(--font-display);
   font-weight: 700;
@@ -230,19 +215,6 @@ h1 {
 .rider.current {
   border-color: var(--moss);
   box-shadow: inset 0 0 0 1px var(--moss);
-}
-.avatar {
-  flex: none;
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  display: grid;
-  place-items: center;
-  background: var(--moss);
-  color: var(--moss-ink);
-  font-family: var(--font-display);
-  font-weight: 700;
-  font-size: 20px;
 }
 .who {
   display: flex;

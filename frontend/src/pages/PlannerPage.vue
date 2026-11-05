@@ -2,13 +2,15 @@
 import { computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
-import ElevationChart from '@/components/ElevationChart.vue'
-import ExportPanel from '@/components/ExportPanel.vue'
-import LibraryShortcut from '@/components/LibraryShortcut.vue'
-import MapView from '@/components/MapView.vue'
-import PlaceSearch from '@/components/PlaceSearch.vue'
-import PreferencesPanel from '@/components/PreferencesPanel.vue'
-import RouteStats from '@/components/RouteStats.vue'
+import ElevationChart from '@/components/organisms/ElevationChart.vue'
+import ExportPanel from '@/components/organisms/ExportPanel.vue'
+import LibraryShortcut from '@/components/organisms/LibraryShortcut.vue'
+import MapView from '@/components/organisms/MapView.vue'
+import StatusMessage from '@/components/molecules/StatusMessage.vue'
+import PlannerLayout from '@/components/templates/PlannerLayout.vue'
+import PlaceSearch from '@/components/molecules/PlaceSearch.vue'
+import PreferencesPanel from '@/components/organisms/PreferencesPanel.vue'
+import RouteStats from '@/components/organisms/RouteStats.vue'
 import { openRoute, profile, routeId, setStatus, status, viewOnly, waypoints } from '@/planner'
 
 // ---------- URL <-> open route ----------
@@ -55,8 +57,8 @@ const hint = computed(() => {
 </script>
 
 <template>
-  <div class="planner">
-    <aside class="panel">
+  <PlannerLayout>
+    <template #sidebar>
       <PlaceSearch />
       <RouteStats />
       <ExportPanel />
@@ -66,58 +68,21 @@ const hint = computed(() => {
         Map data © OpenStreetMap contributors. Routing by BRouter. Difficulty limits apply only to trails with
         an mtb:scale tag.
       </p>
-    </aside>
-    <main class="stage">
+    </template>
+    <template #stage>
       <MapView />
-      <div v-if="status" class="status" :class="status.kind" role="status" aria-live="polite">
-        {{ status.text }}
-      </div>
+      <StatusMessage :message="status" floating />
       <div v-if="hint" class="hint">{{ hint }}</div>
       <ElevationChart v-if="profile.length > 1" />
-    </main>
-  </div>
+    </template>
+  </PlannerLayout>
 </template>
 
 <style scoped>
-.planner {
-  height: 100%;
-  display: grid;
-  grid-template-columns: 370px 1fr;
-}
-.panel {
-  background: var(--panel);
-  border-right: 1px solid var(--line);
-  overflow-y: auto;
-  min-height: 0;
-  padding: 16px 20px 40px;
-}
 .credits {
   margin-top: 28px;
   color: var(--muted);
   font-size: 12.5px;
-}
-.stage {
-  position: relative;
-  min-height: 0;
-}
-.status {
-  position: absolute;
-  top: 56px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 3;
-  max-width: min(560px, 86%);
-  background: var(--panel);
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  padding: 6px 14px;
-  font-size: 14px;
-  text-align: center;
-  box-shadow: var(--shadow);
-}
-.status.error {
-  border-color: var(--warn);
-  color: var(--warn);
 }
 .hint {
   position: absolute;
@@ -130,22 +95,5 @@ const hint = computed(() => {
   border-radius: 10px;
   padding: 10px 16px;
   box-shadow: var(--shadow);
-}
-@media (max-width: 820px) {
-  .planner {
-    height: auto;
-    grid-template-columns: 1fr;
-  }
-  .stage {
-    height: 62vh;
-    order: -1;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-  }
-  .panel {
-    border-right: none;
-    border-top: 1px solid var(--line);
-  }
 }
 </style>

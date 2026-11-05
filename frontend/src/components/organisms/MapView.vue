@@ -195,7 +195,12 @@ function renderWarnings() {
     note.textContent = 'The route is forced through here. Check on site before you ride.'
     text.append(strong, note)
     const popup = new maplibregl.Popup({ offset: 14 }).setDOMContent(text)
-    return new maplibregl.Marker({ element: el }).setLngLat([w.lng, w.lat]).setPopup(popup).addTo(m)
+    // Pinned just above the route, so the waypoint that often sits at the same spot stays visible
+    // and can still be dragged (waypoints also stack above warnings, see style.css).
+    return new maplibregl.Marker({ element: el, anchor: 'bottom', offset: [0, -6] })
+      .setLngLat([w.lng, w.lat])
+      .setPopup(popup)
+      .addTo(m)
   })
 }
 

@@ -1,12 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { api, ApiError } from '@/api'
+import TabBar from '@/components/molecules/TabBar.vue'
 import type { DeviceInfo, ImportResult, KomootStatus, KomootTour } from '@/types'
 
 const emit = defineEmits<{ imported: [openId: number | null] }>()
 
 const dialog = ref<HTMLDialogElement | null>(null)
-const tab = ref<'files' | 'komoot'>('files')
+const tab = ref<string>('files')
 const busy = ref(false)
 const error = ref('')
 const results = ref<ImportResult[]>([])
@@ -148,26 +149,14 @@ defineExpose({ open })
         <h2 id="import-heading">Import routes</h2>
         <button type="button" class="icon" aria-label="Close" @click="close">✕</button>
       </header>
-      <div class="tabs" role="tablist">
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="tab === 'files'"
-          :class="{ active: tab === 'files' }"
-          @click="tab = 'files'"
-        >
-          Files (GPX, FIT)
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="tab === 'komoot'"
-          :class="{ active: tab === 'komoot' }"
-          @click="tab = 'komoot'"
-        >
-          Komoot
-        </button>
-      </div>
+      <TabBar
+        v-model="tab"
+        class="dialog-tabs"
+        :tabs="[
+          { id: 'files', label: 'Files (GPX, FIT)' },
+          { id: 'komoot', label: 'Komoot' },
+        ]"
+      />
 
       <div v-if="tab === 'files'" class="pane">
         <label
@@ -319,22 +308,9 @@ header h2 {
 .icon {
   padding: 2px 9px;
 }
-.tabs {
-  display: flex;
-  gap: 4px;
+.dialog-tabs {
   margin: 12px 0;
   border-bottom: 1px solid var(--line);
-}
-.tabs button {
-  border: none;
-  border-bottom: 3px solid transparent;
-  border-radius: 0;
-  background: none;
-  padding: 6px 10px;
-}
-.tabs button.active {
-  border-bottom-color: var(--moss);
-  font-weight: 600;
 }
 .drop {
   display: flex;
