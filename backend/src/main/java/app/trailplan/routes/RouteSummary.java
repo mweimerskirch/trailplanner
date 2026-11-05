@@ -2,11 +2,16 @@ package app.trailplan.routes;
 
 import java.time.Instant;
 
-/** One entry of the route library. {@code wahooSyncedAt} is null when never sent to Wahoo. */
+/**
+ * One entry of the route library. {@code deletedAt} is null unless the route is in the trash, and
+ * {@code editable} is false for imported routes that have not been converted to waypoints yet.
+ */
 public record RouteSummary(
     long id,
     String name,
     double distance,
     double ascent,
     Instant updatedAt,
-    Instant wahooSyncedAt) {}
+    RouteSource source,
+    boolean editable,
+    Instant deletedAt) {}

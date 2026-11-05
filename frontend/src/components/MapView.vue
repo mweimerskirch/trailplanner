@@ -3,7 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { GeoJSONSource, LngLat, Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
-import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { onActivated, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { DEFAULT_CENTER } from '@/constants'
 import {
   addRasterLayers,
@@ -46,17 +46,21 @@ function renderRoute() {
   const source = geoJsonSource('route')
   if (!source) return
   const pts = planner.waypoints.value
-  const features = planner.legs.value.flatMap((state, i) => {
-    const from = pts[i]
-    const to = pts[i + 1]
-    if (!from || !to) return []
-    const coordinates =
-      state.status === 'ok'
-        ? state.leg.points.map(([lng, lat]) => [lng, lat])
-        : [
-            [from.lng, from.lat],
-            [to.lng, to.lat],
-          ]
+  // displayLegs is the fixed track in view mode (imported routes), else the calculated legs.
+  const features = planner.displayLegs.value.flatMap((state, i) => {
+    let coordinates: number[][]
+    if (state.status === 'ok') {
+      coordinates = state.leg.points.map(([lng, lat]) => [lng, lat])
+    } else {
+      // Not calculated (yet): a straight dashed line between the two waypoints.
+      const from = pts[i]
+      const to = pts[i + 1]
+      if (!from || !to) return []
+      coordinates = [
+        [from.lng, from.lat],
+        [to.lng, to.lat],
+      ]
+    }
     return [
       {
         type: 'Feature' as const,
@@ -100,11 +104,16 @@ function setDragPreview(lines: [number, number][][]) {
 
 // ---------- markers ----------
 
+/** With many waypoints (e.g. a converted import) numbered markers would pile up: show dots. */
+const COMPACT_MARKERS_FROM = 15
+
 function markerElement(index: number, count: number): HTMLElement {
   const el = document.createElement('button')
   el.type = 'button'
   el.className = 'wp'
-  if (index === 0) {
+  if (index > 0 && index < count - 1 && count >= COMPACT_MARKERS_FROM) {
+    el.classList.add('wp-small')
+  } else if (index === 0) {
     el.classList.add('wp-start')
     el.textContent = 'A'
   } else if (index === count - 1) {
@@ -260,14 +269,14 @@ function setupInteraction(m: MapLibreMap) {
     else planner.insertWaypoint(leg + 1, toPoint(e.lngLat))
   })
   m.on('mousedown', 'route-hit', (e) => {
-    if (e.originalEvent.button !== 0 || startedOnMarker(e)) return
+    if (e.originalEvent.button !== 0 || startedOnMarker(e) || planner.viewOnly.value) return
     const leg = routeLegAt(e.point)
     if (leg === null) return
     e.preventDefault() // keeps the map from panning
     startRouteDrag(leg, e.lngLat, false)
   })
   m.on('touchstart', 'route-hit', (e) => {
-    if (e.points.length !== 1 || startedOnMarker(e)) return
+    if (e.points.length !== 1 || startedOnMarker(e) || planner.viewOnly.value) return
     const leg = routeLegAt(e.point)
     if (leg === null) return
     e.preventDefault()
@@ -283,6 +292,17 @@ function setupInteraction(m: MapLibreMap) {
     const c = m.getCenter()
     localStorage.setItem('trailplan.view', JSON.stringify({ lng: c.lng, lat: c.lat, zoom: m.getZoom() }))
   })
+}
+
+/**
+ * Zoom requests can arrive before the map exists or while the planner page is hidden (a route
+ * opened from the library); they are remembered and carried out once the map can be sized.
+ */
+let fitHandled = 0
+function fitIfRequested() {
+  if (!map || !ready || planner.fitRequest.value === fitHandled || !container.value?.offsetParent) return
+  fitHandled = planner.fitRequest.value
+  fitToRoute()
 }
 
 function fitToRoute() {
@@ -342,8 +362,15 @@ onMounted(() => {
     setupInteraction(m)
     renderRoute()
     renderMarkers()
+    fitIfRequested()
   })
   darkQuery.addEventListener('change', onColorSchemeChange)
+})
+
+// The planner page is kept alive while the library is open; its size may have changed meanwhile.
+onActivated(() => {
+  map?.resize()
+  fitIfRequested()
 })
 
 onBeforeUnmount(() => {
@@ -355,13 +382,13 @@ onBeforeUnmount(() => {
 watch(planner.waypoints, () => {
   if (ready) renderMarkers()
 })
-watch(planner.legs, () => {
+watch(planner.displayLegs, () => {
   if (ready) renderRoute()
 })
 watch(planner.hoverIndex, () => {
   if (ready) renderHover()
 })
-watch(planner.fitRequest, fitToRoute)
+watch(planner.fitRequest, fitIfRequested)
 watch(planner.flyTarget, (target) => {
   if (target && map) map.flyTo({ center: [target.lng, target.lat], zoom: 13 })
 })

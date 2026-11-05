@@ -1,20 +1,31 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '@/api'
 import * as planner from '@/planner'
-import type { WahooStatus } from '@/types'
+import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
+
+const DEVICE_KEY = 'trailplan.device'
 
 const busy = ref(false)
-const wahoo = ref<WahooStatus>({ enabled: false, connected: false })
+const devices = ref<DeviceInfo[]>([])
+const deviceId = ref(localStorage.getItem(DEVICE_KEY) ?? '')
 const canShareFiles = ref(false)
 
-function fileName() {
+/** The chosen device; the first one (the backend's order) if nothing was chosen yet. */
+const device = computed(() => devices.value.find((d) => d.id === deviceId.value) ?? devices.value[0])
+const ready = computed(() => !busy.value && planner.routeComplete.value)
+
+watch(deviceId, (id) => {
+  localStorage.setItem(DEVICE_KEY, id)
+})
+
+function fileName(format: FormatInfo) {
   const slug = planner.routeName.value
     .normalize('NFD')
     .replace(/\p{M}/gu, '')
     .replace(/[^A-Za-z0-9-]+/g, '_')
     .replace(/^_+|_+$/g, '')
-  return `${slug || 'route'}.gpx`
+  return `${slug || 'route'}.${format.extension}`
 }
 
 async function run(task: () => Promise<void>) {
@@ -28,11 +39,18 @@ async function run(task: () => Promise<void>) {
   }
 }
 
-/** Creates or updates the route; recreates it if the saved copy was deleted meanwhile. */
-async function saveDraft(asNew = false) {
+/**
+ * Creates or updates the route; recreates it if the saved copy was deleted meanwhile. Imported
+ * routes in view mode have no waypoints to save, so only their name is updated.
+ */
+async function saveDraft(asNew = false): Promise<RouteDetails> {
   const id = planner.routeId.value
-  let saved
-  if (id === null || asNew) {
+  let saved: RouteDetails
+  if (planner.viewOnly.value && id !== null) {
+    saved = asNew
+      ? await api.duplicateRoute(id)
+      : await api.renameRoute(id, planner.routeName.value.trim() || 'Route')
+  } else if (id === null || asNew) {
     saved = await api.createRoute(planner.draft())
   } else {
     try {
@@ -43,6 +61,7 @@ async function saveDraft(asNew = false) {
     }
   }
   planner.routeId.value = saved.id
+  planner.routeName.value = saved.name
   planner.libraryVersion.value++
   return saved
 }
@@ -53,18 +72,23 @@ const save = (asNew: boolean) =>
     planner.setStatus(`Saved “${saved.name}”.`, 'info', 2500)
   })
 
-async function gpxFile(): Promise<File> {
-  const blob = await api.gpx(planner.draft())
-  return new File([blob], fileName(), { type: 'application/gpx+xml' })
+/** Imported routes are exported with their original track, planned ones are recalculated. */
+async function file(format: FormatInfo): Promise<File> {
+  const id = planner.routeId.value
+  const blob =
+    planner.viewOnly.value && id !== null
+      ? await api.exportSaved(id, format.id)
+      : await api.exportDraft(format.id, planner.draft())
+  return new File([blob], fileName(format), { type: blob.type })
 }
 
-const download = () =>
+const download = (format: FormatInfo) =>
   run(async () => {
-    const file = await gpxFile()
-    const url = URL.createObjectURL(file)
+    const f = await file(format)
+    const url = URL.createObjectURL(f)
     const link = document.createElement('a')
     link.href = url
-    link.download = file.name
+    link.download = f.name
     document.body.append(link)
     link.click()
     link.remove()
@@ -73,30 +97,50 @@ const download = () =>
     }, 2000)
   })
 
-const share = () =>
+const share = (format: FormatInfo) =>
   run(async () => {
-    const file = await gpxFile()
+    const f = await file(format)
     try {
-      await navigator.share({ files: [file], title: planner.routeName.value })
+      await navigator.share({ files: [f], title: planner.routeName.value })
     } catch (error) {
       if (error instanceof DOMException && error.name === 'AbortError') return
       throw error
     }
   })
 
-const sendToWahoo = () =>
+const sendToCloud = () =>
   run(async () => {
-    const saved = await saveDraft()
-    await api.syncToWahoo(saved.id)
-    planner.libraryVersion.value++
-    planner.setStatus('Sent to your Wahoo account. Sync the BOLT to load it.', 'info', 4000)
+    const target = device.value
+    if (!target?.cloud) return
+    const saved = planner.viewOnly.value && planner.routeId.value !== null ? null : await saveDraft()
+    const id = saved?.id ?? planner.routeId.value
+    if (id === null) return
+    await api.sendToCloud(target.id, id)
+    planner.setStatus(
+      `Sent to your ${target.cloud.serviceName} account. Sync the device to load it.`,
+      'info',
+      4000,
+    )
   })
 
 const disconnect = () =>
   run(async () => {
-    await api.disconnectWahoo()
-    wahoo.value = { ...wahoo.value, connected: false }
+    const target = device.value
+    if (!target) return
+    await api.disconnectCloud(target.id)
+    await loadDevices()
   })
+
+async function loadDevices() {
+  try {
+    devices.value = await api.devices()
+    // Nothing chosen yet (or a device that no longer exists): show the first one as selected.
+    const first = devices.value[0]
+    if (first && !devices.value.some((d) => d.id === deviceId.value)) deviceId.value = first.id
+  } catch (error) {
+    if (!(error instanceof ApiError)) throw error
+  }
+}
 
 onMounted(async () => {
   try {
@@ -105,92 +149,86 @@ onMounted(async () => {
   } catch {
     canShareFiles.value = false
   }
-  try {
-    wahoo.value = await api.wahooStatus()
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-  }
+  await loadDevices()
 })
 </script>
 
 <template>
   <section aria-labelledby="export-heading">
-    <h2 id="export-heading">Save &amp; send to the BOLT</h2>
+    <h2 id="export-heading">Save &amp; send</h2>
     <div class="field">
       <label for="route-name">Route name</label>
       <input id="route-name" v-model="planner.routeName.value" type="text" maxlength="120" />
     </div>
     <div class="row">
-      <button
-        type="button"
-        class="primary"
-        :disabled="busy || !planner.routeComplete.value"
-        @click="save(false)"
-      >
-        {{ planner.routeId.value === null ? 'Save to library' : 'Save changes' }}
+      <button type="button" class="primary" :disabled="!ready" @click="save(false)">
+        {{
+          planner.routeId.value === null
+            ? 'Save to library'
+            : planner.viewOnly.value
+              ? 'Save name'
+              : 'Save changes'
+        }}
       </button>
-      <button
-        v-if="planner.routeId.value !== null"
-        type="button"
-        :disabled="busy || !planner.routeComplete.value"
-        @click="save(true)"
-      >
+      <button v-if="planner.routeId.value !== null" type="button" :disabled="!ready" @click="save(true)">
         Save as new
       </button>
     </div>
-    <div class="row">
-      <button type="button" :disabled="busy || !planner.routeComplete.value" @click="download">
-        Download GPX
-      </button>
-      <button
-        v-if="canShareFiles"
-        type="button"
-        :disabled="busy || !planner.routeComplete.value"
-        @click="share"
-      >
-        Share GPX
-      </button>
-      <template v-if="wahoo.enabled">
-        <button
-          v-if="wahoo.connected"
-          type="button"
-          :disabled="busy || !planner.routeComplete.value"
-          @click="sendToWahoo"
-        >
-          Send to Wahoo
-        </button>
-        <a v-else class="button" href="/api/wahoo/connect">Connect Wahoo</a>
-      </template>
-    </div>
-    <p v-if="wahoo.enabled && wahoo.connected" class="small">
-      Wahoo connected. <button type="button" class="link" @click="disconnect">Disconnect</button>
-    </p>
 
-    <details>
-      <summary>Copy to the BOLT over USB</summary>
-      <ol>
-        <li>Switch the BOLT on and connect it with a USB data cable.</li>
-        <li>
-          Copy the GPX into the device’s <code>routes</code> folder. Windows: it appears under “This PC”.
-          macOS: use an MTP app such as OpenMTP. Linux: your file manager, or
-          <code>scripts/copy-to-bolt.sh</code>.
-        </li>
-        <li>On the BOLT, open the map page, choose ROUTE, and press SYNC if the route isn’t listed.</li>
-      </ol>
-    </details>
-    <details>
-      <summary>Import with the ELEMNT app</summary>
-      <p>
-        On your phone, open the GPX (or use “Share GPX”) and choose the ELEMNT app. The route syncs to the
-        BOLT over Bluetooth or Wi‑Fi.
+    <template v-if="device">
+      <div v-if="devices.length > 1" class="field device">
+        <label for="device">Send to</label>
+        <select id="device" v-model="deviceId">
+          <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
+        </select>
+      </div>
+      <div class="row">
+        <button
+          v-for="format in device.formats"
+          :key="format.id"
+          type="button"
+          :disabled="!ready"
+          @click="download(format)"
+        >
+          Download {{ format.label }}
+        </button>
+        <button
+          v-if="canShareFiles && device.formats[0]"
+          type="button"
+          :disabled="!ready"
+          @click="share(device.formats[0])"
+        >
+          Share {{ device.formats[0].label }}
+        </button>
+        <template v-if="device.cloud?.enabled">
+          <button v-if="device.cloud.connected" type="button" :disabled="!ready" @click="sendToCloud">
+            Send to {{ device.cloud.serviceName }}
+          </button>
+          <a v-else class="button" :href="device.cloud.connectPath">Connect {{ device.cloud.serviceName }}</a>
+        </template>
+      </div>
+      <p v-if="device.cloud?.enabled && device.cloud.connected" class="small">
+        {{ device.cloud.serviceName }} connected.
+        <button type="button" class="link" @click="disconnect">Disconnect</button>
       </p>
-    </details>
+
+      <details v-for="method in device.transferMethods" :key="method.title">
+        <summary>{{ method.title }}</summary>
+        <ol>
+          <li v-for="(step, i) in method.steps" :key="i">{{ step }}</li>
+        </ol>
+      </details>
+    </template>
   </section>
 </template>
 
 <style scoped>
-.row + .row {
+.row + .row,
+.device + .row {
   margin-top: 8px;
+}
+.device {
+  margin-top: 12px;
 }
 .small {
   font-size: 13.5px;

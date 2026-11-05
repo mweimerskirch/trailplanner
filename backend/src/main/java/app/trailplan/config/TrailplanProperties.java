@@ -7,7 +7,7 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("trailplan")
-public record TrailplanProperties(Router router, Wahoo wahoo) {
+public record TrailplanProperties(Router router, Wahoo wahoo, @DefaultValue Komoot komoot) {
 
   /**
    * @param baseUrl BRouter server, e.g. http://brouter:17777
@@ -37,4 +37,12 @@ public record TrailplanProperties(Router router, Wahoo wahoo) {
       return publicUrl.resolve("/api/wahoo/callback");
     }
   }
+
+  /**
+   * Komoot import. Komoot has no official API for personal accounts; this uses the same unofficial
+   * API as komoot.com, which may change without notice.
+   *
+   * @param apiBase Komoot API server (overridden in tests)
+   */
+  public record Komoot(@DefaultValue("https://api.komoot.de") URI apiBase) {}
 }

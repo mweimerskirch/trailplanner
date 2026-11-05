@@ -17,11 +17,19 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+/** Routes in SQLite. Trashed routes keep their row with {@code deleted_at} set. */
 @Repository
 public class RouteRepository {
 
   private static final TypeReference<List<GeoPoint>> WAYPOINTS = new TypeReference<>() {};
   private static final TypeReference<List<TrackPoint>> TRACK = new TypeReference<>() {};
+  private static final TypeReference<RoutingPreferences> PREFERENCES = new TypeReference<>() {};
+
+  private static final String SUMMARY_COLUMNS =
+      """
+      id, name, distance_m, ascent_m, updated_at, source, deleted_at,
+      waypoints_json <> '[]' AS editable
+      """;
 
   private final JdbcClient jdbc;
   private final ObjectMapper json;
@@ -31,20 +39,23 @@ public class RouteRepository {
     this.json = json;
   }
 
-  public List<RouteSummary> findAllSummaries() {
+  /** Routes in the library, most recently changed first. */
+  public List<RouteSummary> findActiveSummaries() {
     return jdbc.sql(
-            """
-            SELECT id, name, distance_m, ascent_m, updated_at, wahoo_synced_at
-            FROM route ORDER BY updated_at DESC
-            """)
-        .query((rs, row) ->
-            new RouteSummary(
-                rs.getLong("id"),
-                rs.getString("name"),
-                rs.getDouble("distance_m"),
-                rs.getDouble("ascent_m"),
-                Instant.parse(rs.getString("updated_at")),
-                instantOrNull(rs, "wahoo_synced_at")))
+            "SELECT "
+                + SUMMARY_COLUMNS
+                + " FROM route WHERE deleted_at IS NULL ORDER BY updated_at DESC")
+        .query(RouteRepository::mapSummary)
+        .list();
+  }
+
+  /** Routes in the trash, most recently deleted first. */
+  public List<RouteSummary> findTrashedSummaries() {
+    return jdbc.sql(
+            "SELECT "
+                + SUMMARY_COLUMNS
+                + " FROM route WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC")
+        .query(RouteRepository::mapSummary)
         .list();
   }
 
@@ -55,29 +66,87 @@ public class RouteRepository {
         .optional();
   }
 
+  /** The id of a route in the library (not the trash) imported from this source, if any. */
+  public Optional<Long> findActiveIdByExternalId(String externalId) {
+    return jdbc.sql("SELECT id FROM route WHERE external_id = :eid AND deleted_at IS NULL LIMIT 1")
+        .param("eid", externalId)
+        .query(Long.class)
+        .optional();
+  }
+
+  /** External ids of all routes in the library (not the trash) that start with this prefix. */
+  public List<String> findActiveExternalIds(String prefix) {
+    return jdbc.sql(
+            """
+            SELECT external_id FROM route
+            WHERE deleted_at IS NULL AND external_id LIKE :prefix || '%'
+            """)
+        .param("prefix", prefix)
+        .query(String.class)
+        .list();
+  }
+
   public long insert(RouteDraft draft, PlannedRoute planned, Instant now) {
+    return insert(
+        draft.name(),
+        write(draft.waypoints()),
+        write(draft.preferences()),
+        write(planned.points()),
+        planned.distance(),
+        planned.ascent(),
+        planned.descent(),
+        RouteSource.PLANNER,
+        null,
+        now);
+  }
+
+  /** Stores an imported track as-is; it gets waypoints only when the rider converts it. */
+  public long insertImported(ImportedRoute route, Instant now) {
+    return insert(
+        route.name(),
+        write(List.of()),
+        write(RoutingPreferences.defaults()),
+        write(route.track()),
+        route.distance(),
+        route.ascent(),
+        route.descent(),
+        route.source(),
+        route.externalId(),
+        now);
+  }
+
+  private long insert(
+      String name,
+      String waypoints,
+      String preferences,
+      String track,
+      double distance,
+      double ascent,
+      double descent,
+      RouteSource source,
+      String externalId,
+      Instant now) {
     KeyHolder keys = new GeneratedKeyHolder();
     jdbc.sql(
             """
             INSERT INTO route (name, waypoints_json, preferences_json, track_json,
-                               distance_m, ascent_m, descent_m, created_at, updated_at)
+                               distance_m, ascent_m, descent_m, created_at, updated_at,
+                               source, external_id)
             VALUES (:name, :waypoints, :preferences, :track,
-                    :distance, :ascent, :descent, :now, :now)
+                    :distance, :ascent, :descent, :now, :now, :source, :externalId)
             """)
-        .param("name", draft.name())
-        .param("waypoints", write(draft.waypoints()))
-        .param("preferences", write(draft.preferences()))
-        .param("track", write(planned.points()))
-        .param("distance", planned.distance())
-        .param("ascent", planned.ascent())
-        .param("descent", planned.descent())
+        .param("name", name)
+        .param("waypoints", waypoints)
+        .param("preferences", preferences)
+        .param("track", track)
+        .param("distance", distance)
+        .param("ascent", ascent)
+        .param("descent", descent)
         .param("now", now.toString())
+        .param("source", source.name())
+        .param("externalId", externalId)
         .update(keys);
-    Number key = keys.getKey();
-    if (key == null) {
-      throw new IllegalStateException("SQLite returned no id for the new route");
-    }
-    return key.longValue();
+    return generatedId(keys);
   }
 
   public boolean update(long id, RouteDraft draft, PlannedRoute planned, Instant now) {
@@ -101,41 +170,101 @@ public class RouteRepository {
         == 1;
   }
 
-  public boolean delete(long id) {
+  public boolean rename(long id, String name, Instant now) {
+    return jdbc.sql("UPDATE route SET name = :name, updated_at = :now WHERE id = :id")
+            .param("id", id)
+            .param("name", name)
+            .param("now", now.toString())
+            .update()
+        == 1;
+  }
+
+  /**
+   * Copies a route under a new name. The copy has no cloud links (they live in their own table) and
+   * no import id, so re-sending or re-importing never confuses it with the original.
+   *
+   * @return the id of the copy, or empty if the original does not exist
+   */
+  public Optional<Long> duplicate(long id, String name, Instant now) {
+    KeyHolder keys = new GeneratedKeyHolder();
+    int rows =
+        jdbc.sql(
+                """
+                INSERT INTO route (name, waypoints_json, preferences_json, track_json,
+                                   distance_m, ascent_m, descent_m, created_at, updated_at,
+                                   source, external_id)
+                SELECT :name, waypoints_json, preferences_json, track_json,
+                       distance_m, ascent_m, descent_m, :now, :now, source, NULL
+                FROM route WHERE id = :id
+                """)
+            .param("id", id)
+            .param("name", name)
+            .param("now", now.toString())
+            .update(keys);
+    return rows == 1 ? Optional.of(generatedId(keys)) : Optional.empty();
+  }
+
+  /** Moves a route to the trash. False if it does not exist or is already there. */
+  public boolean moveToTrash(long id, Instant now) {
+    return jdbc.sql("UPDATE route SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL")
+            .param("id", id)
+            .param("now", now.toString())
+            .update()
+        == 1;
+  }
+
+  /** Takes a route out of the trash. False if it does not exist or is not in the trash. */
+  public boolean restore(long id) {
+    return jdbc.sql("UPDATE route SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL")
+            .param("id", id)
+            .update()
+        == 1;
+  }
+
+  public boolean deletePermanently(long id) {
     return jdbc.sql("DELETE FROM route WHERE id = :id").param("id", id).update() == 1;
   }
 
-  public void markSyncedToWahoo(long id, long wahooRouteId, Instant at) {
-    jdbc.sql("UPDATE route SET wahoo_route_id = :wid, wahoo_synced_at = :at WHERE id = :id")
-        .param("id", id)
-        .param("wid", wahooRouteId)
-        .param("at", at.toString())
-        .update();
+  /** Deletes every route in the trash for good and returns how many there were. */
+  public int emptyTrash() {
+    return jdbc.sql("DELETE FROM route WHERE deleted_at IS NOT NULL").update();
   }
 
-  /** Called when Wahoo no longer knows the route, e.g. after it was deleted in the app. */
-  public void clearWahooLink(long id) {
-    jdbc.sql("UPDATE route SET wahoo_route_id = NULL, wahoo_synced_at = NULL WHERE id = :id")
-        .param("id", id)
-        .update();
+  private static RouteSummary mapSummary(ResultSet rs, int row) throws SQLException {
+    return new RouteSummary(
+        rs.getLong("id"),
+        rs.getString("name"),
+        rs.getDouble("distance_m"),
+        rs.getDouble("ascent_m"),
+        Instant.parse(rs.getString("updated_at")),
+        RouteSource.valueOf(rs.getString("source")),
+        rs.getBoolean("editable"),
+        instantOrNull(rs, "deleted_at"));
   }
 
   private StoredRoute map(ResultSet rs, int row) throws SQLException {
-    long wahooId = rs.getLong("wahoo_route_id");
-    Optional<Long> wahooRouteId = rs.wasNull() ? Optional.empty() : Optional.of(wahooId);
     return new StoredRoute(
         rs.getLong("id"),
         rs.getString("name"),
         read(rs.getString("waypoints_json"), WAYPOINTS),
-        read(rs.getString("preferences_json"), new TypeReference<RoutingPreferences>() {}),
+        read(rs.getString("preferences_json"), PREFERENCES),
         read(rs.getString("track_json"), TRACK),
         rs.getDouble("distance_m"),
         rs.getDouble("ascent_m"),
         rs.getDouble("descent_m"),
         Instant.parse(rs.getString("created_at")),
         Instant.parse(rs.getString("updated_at")),
-        wahooRouteId,
-        Optional.ofNullable(instantOrNull(rs, "wahoo_synced_at")));
+        RouteSource.valueOf(rs.getString("source")),
+        Optional.ofNullable(rs.getString("external_id")),
+        Optional.ofNullable(instantOrNull(rs, "deleted_at")));
+  }
+
+  private static long generatedId(KeyHolder keys) {
+    Number key = keys.getKey();
+    if (key == null) {
+      throw new IllegalStateException("SQLite returned no id for the new route");
+    }
+    return key.longValue();
   }
 
   private static Instant instantOrNull(ResultSet rs, String column) throws SQLException {

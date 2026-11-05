@@ -1,12 +1,15 @@
 import type {
+  CloudSyncResult,
+  DeviceInfo,
   GeoPoint,
+  ImportResult,
+  KomootStatus,
+  KomootTour,
   RouteDetails,
   RouteDraft,
   RouteLeg,
   RouteSummary,
   RoutingPreferences,
-  WahooStatus,
-  WahooSyncResult,
 } from './types'
 
 export class ApiError extends Error {
@@ -35,7 +38,10 @@ async function errorMessage(response: Response): Promise<string> {
 
 async function send(path: string, init: RequestInit = {}, signal?: AbortSignal): Promise<Response> {
   const headers = new Headers(init.headers)
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
+  // FormData bodies (file uploads) need the browser's multipart Content-Type with its boundary.
+  if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json')
+  }
   if (!headers.has('Accept')) headers.set('Accept', 'application/json')
   let response: Response
   try {
@@ -78,29 +84,93 @@ export const api = {
     return json<RouteDetails>(`/api/routes/${id}`, { method: 'PUT', body: JSON.stringify(draft) })
   },
 
+  renameRoute(id: number, name: string) {
+    return json<RouteDetails>(`/api/routes/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+  },
+
+  duplicateRoute(id: number) {
+    return json<RouteDetails>(`/api/routes/${id}/duplicate`, { method: 'POST' })
+  },
+
+  /** Moves the route to the trash. */
   async deleteRoute(id: number) {
     await send(`/api/routes/${id}`, { method: 'DELETE' })
   },
 
-  async gpx(draft: RouteDraft): Promise<Blob> {
-    const response = await send('/api/export/gpx', {
+  listTrash() {
+    return json<RouteSummary[]>('/api/routes/trash')
+  },
+
+  restoreRoute(id: number) {
+    return json<RouteDetails>(`/api/routes/${id}/restore`, { method: 'POST' })
+  },
+
+  async deleteRoutePermanently(id: number) {
+    await send(`/api/routes/${id}/permanent`, { method: 'DELETE' })
+  },
+
+  emptyTrash() {
+    return json<{ deleted: number }>('/api/routes/trash', { method: 'DELETE' })
+  },
+
+  /** The route in the planner as a file in the given format; the track is recalculated. */
+  async exportDraft(format: string, draft: RouteDraft): Promise<Blob> {
+    const response = await send(`/api/export/${format}`, {
       method: 'POST',
       body: JSON.stringify(draft),
-      headers: { Accept: 'application/gpx+xml' },
+      headers: { Accept: '*/*' },
     })
     return response.blob()
   },
 
-  wahooStatus() {
-    return json<WahooStatus>('/api/wahoo/status')
+  /** A saved route as a file, with its stored track (the original one for imported routes). */
+  async exportSaved(id: number, format: string): Promise<Blob> {
+    const response = await send(`/api/routes/${id}/export/${format}`, { headers: { Accept: '*/*' } })
+    return response.blob()
   },
 
-  syncToWahoo(id: number) {
-    return json<WahooSyncResult>(`/api/routes/${id}/wahoo`, { method: 'POST' })
+  devices() {
+    return json<DeviceInfo[]>('/api/devices')
   },
 
-  async disconnectWahoo() {
-    await send('/api/wahoo/connection', { method: 'DELETE' })
+  sendToCloud(deviceId: string, routeId: number) {
+    return json<CloudSyncResult>(`/api/devices/${deviceId}/cloud/routes/${routeId}`, { method: 'POST' })
+  },
+
+  async disconnectCloud(deviceId: string) {
+    await send(`/api/devices/${deviceId}/cloud/connection`, { method: 'DELETE' })
+  },
+
+  importFiles(files: File[]) {
+    const form = new FormData()
+    for (const file of files) form.append('files', file)
+    return json<ImportResult[]>('/api/import/files', { method: 'POST', body: form })
+  },
+
+  komootStatus() {
+    return json<KomootStatus>('/api/komoot/status')
+  },
+
+  komootLogin(email: string, password: string) {
+    return json<KomootStatus>('/api/komoot/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    })
+  },
+
+  async komootLogout() {
+    await send('/api/komoot/login', { method: 'DELETE' })
+  },
+
+  komootTours() {
+    return json<KomootTour[]>('/api/komoot/tours')
+  },
+
+  komootImport(tourIds: number[]) {
+    return json<ImportResult[]>('/api/komoot/import', {
+      method: 'POST',
+      body: JSON.stringify({ tourIds }),
+    })
   },
 }
 

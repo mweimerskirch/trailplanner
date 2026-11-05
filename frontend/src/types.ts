@@ -42,33 +42,94 @@ export interface RouteDraft {
   preferences: RoutingPreferences
 }
 
+export type RouteSource = 'PLANNER' | 'GPX' | 'FIT' | 'KOMOOT'
+
 export interface RouteSummary {
   id: number
   name: string
   distance: number
   ascent: number
   updatedAt: string
-  wahooSyncedAt: string | null
+  source: RouteSource
+  /** False for imported routes that have not been converted to waypoints yet. */
+  editable: boolean
+  /** Set while the route is in the trash. */
+  deletedAt: string | null
 }
 
 export interface RouteDetails {
   id: number
   name: string
+  /** Empty for imported routes that are not editable yet. */
   waypoints: GeoPoint[]
   preferences: RoutingPreferences
+  /** The stored track; for imported routes the original one. */
+  track: TrackPoint[]
   distance: number
   ascent: number
+  descent: number
   createdAt: string
   updatedAt: string
-  wahooSyncedAt: string | null
+  source: RouteSource
+  editable: boolean
+  deletedAt: string | null
 }
 
-export interface WahooStatus {
+export interface FormatInfo {
+  id: string
+  label: string
+  extension: string
+}
+
+export interface TransferMethod {
+  title: string
+  steps: string[]
+}
+
+export interface CloudInfo {
+  serviceName: string
   enabled: boolean
   connected: boolean
+  connectPath: string
 }
 
-export interface WahooSyncResult {
-  wahooRouteId: number
+/** A device plugin as described by the backend (app.trailplan.devices). */
+export interface DeviceInfo {
+  id: string
+  name: string
+  formats: FormatInfo[]
+  transferMethods: TransferMethod[]
+  importInstructions: string | null
+  cloud: CloudInfo | null
+}
+
+export interface CloudSyncResult {
+  service: string
+  remoteId: string
   syncedAt: string
+}
+
+export interface ImportResult {
+  /** File name or Komoot tour id. */
+  source: string
+  status: 'IMPORTED' | 'ALREADY_IMPORTED' | 'FAILED'
+  routeId: number | null
+  name: string | null
+  message: string | null
+}
+
+export interface KomootStatus {
+  connected: boolean
+  displayName: string | null
+}
+
+export interface KomootTour {
+  id: number
+  name: string
+  planned: boolean
+  sport: string
+  distance: number
+  ascent: number
+  date: string | null
+  imported: boolean
 }

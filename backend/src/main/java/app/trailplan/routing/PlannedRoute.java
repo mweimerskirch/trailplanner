@@ -29,25 +29,6 @@ public record PlannedRoute(
       ascent += leg.ascent();
       breakdown = breakdown.plus(leg.breakdown());
     }
-    return new PlannedRoute(points, distance, ascent, descent(points), breakdown);
-  }
-
-  /** Simple descent estimate with a 3 m hysteresis to ignore elevation-model noise. */
-  private static double descent(List<TrackPoint> points) {
-    double total = 0;
-    Double reference = null;
-    for (TrackPoint p : points) {
-      Double ele = p.ele();
-      if (ele == null) {
-        continue;
-      }
-      if (reference == null || ele > reference) {
-        reference = ele;
-      } else if (reference - ele >= 3) {
-        total += reference - ele;
-        reference = ele;
-      }
-    }
-    return total;
+    return new PlannedRoute(points, distance, ascent, TrackStats.descent(points), breakdown);
   }
 }

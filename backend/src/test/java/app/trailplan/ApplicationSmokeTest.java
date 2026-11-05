@@ -77,8 +77,14 @@ class ApplicationSmokeTest {
     assertThat(response.body())
         .contains("\"name\":\"Smoke test\"")
         .contains("\"updatedAt\":\"2026-01-02T03:04:05Z\"")
-        .contains("\"wahooSyncedAt\":null");
-    assertThat(get("/api/routes/" + id + "/gpx").body()).contains("<trkpt lat=\"49.610000\"");
+        .contains("\"deletedAt\":null");
+    assertThat(get("/api/routes/" + id + "/export/gpx").body())
+        .contains("<trkpt lat=\"49.610000\"");
+    HttpResponse<String> fit = get("/api/routes/" + id + "/export/fit");
+    assertThat(fit.headers().firstValue("Content-Disposition"))
+        .hasValueSatisfying(v -> assertThat(v).contains("Smoke_test.fit"));
+    assertThat(fit.body().substring(8, 12)).isEqualTo(".FIT");
+    assertThat(get("/api/routes/" + id + "/export/kml").statusCode()).isEqualTo(400);
   }
 
   @Test

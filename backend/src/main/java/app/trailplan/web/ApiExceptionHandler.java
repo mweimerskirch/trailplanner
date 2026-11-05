@@ -1,5 +1,7 @@
 package app.trailplan.web;
 
+import app.trailplan.devices.DeviceException;
+import app.trailplan.komoot.KomootException;
 import app.trailplan.routes.RouteNotFoundException;
 import app.trailplan.routing.RoutingException;
 import app.trailplan.wahoo.WahooException;
@@ -48,6 +50,23 @@ public class ApiExceptionHandler {
     log.warn("Wahoo request failed: {}", e.getMessage(), e.getCause());
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
     problem.setTitle("Wahoo sync failed");
+    return problem;
+  }
+
+  @ExceptionHandler
+  ProblemDetail komoot(KomootException e) {
+    if (e.status().is5xxServerError()) {
+      log.warn("Komoot request failed: {}", e.getMessage(), e.getCause());
+    }
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
+    problem.setTitle("Komoot import failed");
+    return problem;
+  }
+
+  @ExceptionHandler
+  ProblemDetail device(DeviceException e) {
+    ProblemDetail problem = ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
+    problem.setTitle("Sending failed");
     return problem;
   }
 }

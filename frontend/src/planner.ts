@@ -1,6 +1,7 @@
 import { computed, ref, shallowRef, toRaw, watch } from 'vue'
 import { api, ApiError } from './api'
 import { DEFAULT_PREFERENCES } from './constants'
+import { deriveWaypoints } from './convert'
 import type {
   GeoPoint,
   LegBreakdown,
@@ -9,6 +10,7 @@ import type {
   RouteLeg,
   RoutingPreferences,
   Surface,
+  TrackPoint,
   WayCategory,
 } from './types'
 
@@ -16,7 +18,18 @@ import type {
  * The planner's state, shared by all components. Waypoints are the source of truth; legs are
  * recalculated from them (each leg between two consecutive waypoints, cached by position and
  * preferences, so moving one point only recalculates its two legs).
+ *
+ * Imported routes that have not been converted yet are shown as a fixed track (`fixedTrack`)
+ * instead: no waypoints, nothing to recalculate, and editing is blocked until the rider converts
+ * the track with `editImportedRoute()`.
  */
+
+/** An imported track shown as-is. Distance and climbing come from the import. */
+export interface FixedTrack {
+  points: TrackPoint[]
+  distance: number
+  ascent: number
+}
 
 export type LegState =
   { status: 'loading' } | { status: 'ok'; leg: RouteLeg } | { status: 'error'; message: string }
@@ -44,6 +57,7 @@ interface StoredState {
   routeName?: string
   routeId?: number | null
   speed?: number
+  fixedTrack?: FixedTrack | null
 }
 
 function loadStored(): StoredState {
@@ -72,6 +86,9 @@ export const routeName = ref(stored.routeName ?? 'MTB tour')
 export const routeId = ref<number | null>(stored.routeId ?? null)
 /** Average speed on the flat in km/h, for the time estimate only. */
 export const speed = ref(stored.speed ?? 16)
+/** Set while an imported, not yet converted route is open (view mode). */
+export const fixedTrack = shallowRef<FixedTrack | null>(stored.fixedTrack ?? null)
+export const viewOnly = computed(() => fixedTrack.value !== null)
 
 export const legs = shallowRef<LegState[]>([])
 export const status = ref<StatusMessage | null>(null)
@@ -89,14 +106,19 @@ export const libraryVersion = ref(0)
  */
 interface HistoryEntry {
   waypoints: GeoPoint[]
-  route?: { id: number | null; name: string; preferences: RoutingPreferences }
+  route?: {
+    id: number | null
+    name: string
+    preferences: RoutingPreferences
+    fixedTrack: FixedTrack | null
+  }
 }
 
 const history: HistoryEntry[] = []
 export const canUndo = ref(false)
 
 watch(
-  [waypoints, preferences, routeName, routeId, speed],
+  [waypoints, preferences, routeName, routeId, speed, fixedTrack],
   () => {
     const state: StoredState = {
       waypoints: waypoints.value,
@@ -104,6 +126,7 @@ watch(
       routeName: routeName.value,
       routeId: routeId.value,
       speed: speed.value,
+      fixedTrack: fixedTrack.value,
     }
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
@@ -134,6 +157,7 @@ export function remember(includeRoute = false) {
             id: routeId.value,
             name: routeName.value,
             preferences: structuredClone(toRaw(preferences.value)),
+            fixedTrack: fixedTrack.value,
           },
         }
       : {}),
@@ -143,6 +167,10 @@ export function remember(includeRoute = false) {
 }
 
 function edit(change: (points: GeoPoint[]) => void, recordHistory = true) {
+  if (fixedTrack.value) {
+    setStatus('This route was imported. Press “Edit route” to change it.', 'info', 4000)
+    return
+  }
   if (recordHistory) remember()
   const next = waypoints.value.map((p) => ({ ...p }))
   change(next)
@@ -181,13 +209,15 @@ export function undo() {
       routeId.value = previous.route.id
       routeName.value = previous.route.name
       preferences.value = previous.route.preferences
+      fixedTrack.value = previous.route.fixedTrack
     }
   }
   canUndo.value = history.length > 0
 }
 
 export function newRoute() {
-  if (waypoints.value.length > 0 || routeId.value !== null) remember(true)
+  if (waypoints.value.length > 0 || routeId.value !== null || fixedTrack.value) remember(true)
+  fixedTrack.value = null
   edit((pts) => pts.splice(0), false)
   routeId.value = null
   routeName.value = 'MTB tour'
@@ -195,11 +225,33 @@ export function newRoute() {
 
 export function openRoute(route: RouteDetails) {
   remember(true)
+  fixedTrack.value = route.editable
+    ? null
+    : { points: route.track, distance: route.distance, ascent: route.ascent }
   waypoints.value = route.waypoints.map((p) => ({ ...p }))
   preferences.value = mergePreferences(route.preferences)
   routeName.value = route.name
   routeId.value = route.id
   fitRequest.value++
+}
+
+/**
+ * Converts the open imported route into waypoints. The route is then recalculated with the
+ * rider's preferences, so it may differ slightly from the original; saving makes it editable for
+ * good. Undo goes back to the original track.
+ */
+export function editImportedRoute() {
+  const track = fixedTrack.value
+  if (!track) return
+  remember(true)
+  const points = deriveWaypoints(track.points)
+  fixedTrack.value = null
+  waypoints.value = points
+  setStatus(
+    `Converted to ${points.length} waypoints. The route now follows your preferences and may differ slightly from the original; save to keep it.`,
+    'info',
+    8000,
+  )
 }
 
 export function draft(): RouteDraft {
@@ -284,11 +336,24 @@ watch(
 
 // ---------- derived route data ----------
 
+/** What the map and the statistics show: the fixed track in view mode, else the calculated legs. */
+export const displayLegs = computed<LegState[]>(() => {
+  const track = fixedTrack.value
+  if (!track) return legs.value
+  const leg: RouteLeg = {
+    points: track.points,
+    distance: track.distance,
+    ascent: track.ascent,
+    breakdown: { wayTypes: {}, surfaces: {}, other: 0 },
+  }
+  return [{ status: 'ok', leg }]
+})
+
 export const routeComplete = computed(
-  () => legs.value.length > 0 && legs.value.every((l) => l.status === 'ok'),
+  () => displayLegs.value.length > 0 && displayLegs.value.every((l) => l.status === 'ok'),
 )
 
-const okLegs = computed(() => legs.value.flatMap((l) => (l.status === 'ok' ? [l.leg] : [])))
+const okLegs = computed(() => displayLegs.value.flatMap((l) => (l.status === 'ok' ? [l.leg] : [])))
 
 export const totals = computed(() => {
   const distance = okLegs.value.reduce((sum, leg) => sum + leg.distance, 0)

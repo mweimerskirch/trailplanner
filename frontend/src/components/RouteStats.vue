@@ -53,11 +53,20 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
       </div>
       <BreakdownBar :items="wayTypes" label="Way types along the route" />
       <BreakdownBar :items="surfaces" label="Surfaces along the route" />
+      <div v-if="planner.viewOnly.value" class="imported">
+        <p>
+          Imported route, shown as recorded. Way types are not known until it is edited. Editing places
+          waypoints along it and recalculates it with your preferences, so it may change slightly.
+        </p>
+        <button type="button" class="primary" @click="planner.editImportedRoute">Edit route</button>
+      </div>
     </template>
     <div class="row actions">
       <button type="button" :disabled="!planner.canUndo.value" @click="planner.undo">Undo</button>
-      <button type="button" @click="planner.reverseRoute">Reverse</button>
-      <button type="button" @click="planner.backToStart">Back to start</button>
+      <template v-if="!planner.viewOnly.value">
+        <button type="button" @click="planner.reverseRoute">Reverse</button>
+        <button type="button" @click="planner.backToStart">Back to start</button>
+      </template>
       <button type="button" @click="planner.newRoute">New</button>
     </div>
   </section>
@@ -83,5 +92,17 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
 }
 .actions {
   margin-top: 14px;
+}
+.imported {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--field);
+}
+.imported p {
+  margin: 0 0 8px;
+  font-size: 13.5px;
+  color: var(--muted);
 }
 </style>

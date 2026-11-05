@@ -1,6 +1,7 @@
 package app.trailplan.wahoo;
 
 import app.trailplan.config.TrailplanProperties;
+import app.trailplan.devices.CloudRouteGoneException;
 import app.trailplan.export.FileNames;
 import app.trailplan.export.FitCourseWriter;
 import app.trailplan.routes.StoredRoute;
@@ -90,17 +91,17 @@ public class WahooClient {
   }
 
   /**
-   * Creates or updates the route in the rider's Wahoo account.
+   * Creates the route in the rider's Wahoo account, or updates the Wahoo route {@code existing}.
    *
    * @return the Wahoo route id
+   * @throws CloudRouteGoneException if {@code existing} no longer exists at Wahoo
    */
-  public long uploadRoute(StoredRoute route) {
+  public long uploadRoute(StoredRoute route, Optional<Long> existing) {
     requireEnabled();
     String token = validAccessToken();
     MultiValueMap<String, String> form = routeForm(route);
     try {
       JsonNode response;
-      Optional<Long> existing = route.wahooRouteId();
       if (existing.isPresent()) {
         response =
             http.put()
@@ -126,7 +127,7 @@ public class WahooClient {
       }
       return response.path("id").asLong();
     } catch (HttpClientErrorException.NotFound e) {
-      throw new WahooRouteGoneException(e);
+      throw new CloudRouteGoneException(e);
     } catch (HttpClientErrorException.Unauthorized e) {
       throw new WahooException(
           HttpStatus.CONFLICT, "Wahoo rejected the login. Disconnect and connect Wahoo again.", e);

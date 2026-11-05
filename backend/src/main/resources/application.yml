@@ -12,9 +12,11 @@ spring:
       # SQLite allows one writer at a time; a single connection avoids SQLITE_BUSY errors.
       maximum-pool-size: 1
       connection-init-sql: PRAGMA foreign_keys = ON
-  sql.init:
-    mode: always
   mvc.problemdetails.enabled: true
+  # Route imports: recorded tracks can be a few MB each, and several files are sent at once.
+  servlet.multipart:
+    max-file-size: 25MB
+    max-request-size: 100MB
   jackson:
     default-property-inclusion: always
 

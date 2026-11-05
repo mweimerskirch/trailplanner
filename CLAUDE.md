@@ -14,8 +14,8 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 - Backend: Java 25 and Maven 3.10 from `.sdkmanrc`. Run `sdk env` in the project root (not in
   `backend/`), then `mvn verify` in `backend/`. It runs Error Prone, the tests and the Spotless
   format check. Fix formatting with `mvn spotless:apply`.
-- Frontend: run `npm run typecheck`, `npm run lint` and `npm run build` in `frontend/`. Format
-  with `npm run format`.
+- Frontend: run `npm test`, `npm run typecheck`, `npm run lint` and `npm run build` in
+  `frontend/`. Format with `npm run format`.
 - Docker: `docker compose build`. The backend and BRouter containers must both run as uid 1000
   because they share `data/customprofiles`.
 
@@ -28,3 +28,16 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 - `frontend/src/types.ts` mirrors the Java records. Keep the two in sync.
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
   `MTB_SCALE_VALUES` in `BRouterProfileGenerator` when upgrading BRouter.
+
+## Plugin points
+
+- Devices: implement `devices.DeviceIntegration` as a Spring bean (`@Order` sets its position).
+  It declares export formats, transfer instructions, import instructions and an optional
+  `CloudSync`. The UI builds the export panel from `GET /api/devices`, so a new device needs no
+  frontend change. Cloud links are stored generically in `route_cloud_link` (see
+  `CloudLinkRepository`); a cloud integration needs no columns of its own.
+- Export formats: implement `export.RouteFormat` as a Spring bean. It is served at
+  `/api/routes/{id}/export/{format}` and `/api/export/{format}`.
+- Database: add a new entry at the end of `DatabaseMigrations.MIGRATIONS`. Never change a released
+  entry.
+

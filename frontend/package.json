@@ -10,11 +10,13 @@
     "lint": "eslint . && prettier --check src/ *.ts",
     "lint:fix": "eslint . --fix",
     "preview": "vite preview",
-    "format": "prettier --write src/ *.ts"
+    "format": "prettier --write src/ *.ts",
+    "test": "vitest run"
   },
   "dependencies": {
     "maplibre-gl": "^6.16.0",
-    "vue": "^3.5.45"
+    "vue": "^3.5.45",
+    "vue-router": "^5.4.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
@@ -31,6 +33,7 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.1",
     "vite": "^8.3.6",
+    "vitest": "^5.1.0",
     "vue-tsc": "^3.3.14"
   }
 }
