@@ -5,6 +5,8 @@ import type {
   ImportResult,
   KomootStatus,
   KomootTour,
+  Rider,
+  RiderSummary,
   RouteDetails,
   RouteDraft,
   RouteLeg,
@@ -16,6 +18,8 @@ export class ApiError extends Error {
   constructor(
     message: string,
     readonly status: number,
+    /** Machine-readable reason from the problem response, e.g. NO_USER. */
+    readonly reason: string | null = null,
   ) {
     super(message)
     this.name = 'ApiError'
@@ -25,15 +29,24 @@ export class ApiError extends Error {
 interface ProblemDetail {
   title?: string
   detail?: string
+  reason?: string
 }
 
-async function errorMessage(response: Response): Promise<string> {
+async function toError(response: Response): Promise<ApiError> {
   try {
     const problem = (await response.json()) as ProblemDetail
-    return problem.detail ?? problem.title ?? `Request failed (${response.status})`
+    const message = problem.detail ?? problem.title ?? `Request failed (${response.status})`
+    return new ApiError(message, response.status, problem.reason ?? null)
   } catch {
-    return `Request failed (${response.status})`
+    return new ApiError(`Request failed (${response.status})`, response.status)
   }
+}
+
+let noRiderHandler: (() => void) | null = null
+
+/** Called when the server says no rider is chosen (e.g. the rider was deleted meanwhile). */
+export function onNoRider(handler: () => void) {
+  noRiderHandler = handler
 }
 
 async function send(path: string, init: RequestInit = {}, signal?: AbortSignal): Promise<Response> {
@@ -50,7 +63,11 @@ async function send(path: string, init: RequestInit = {}, signal?: AbortSignal):
     if (error instanceof DOMException && error.name === 'AbortError') throw error
     throw new ApiError('The Trailplan server is not reachable.', 0)
   }
-  if (!response.ok) throw new ApiError(await errorMessage(response), response.status)
+  if (!response.ok) {
+    const error = await toError(response)
+    if (error.reason === 'NO_USER') noRiderHandler?.()
+    throw error
+  }
   return response
 }
 
@@ -145,6 +162,31 @@ export const api = {
     const form = new FormData()
     for (const file of files) form.append('files', file)
     return json<ImportResult[]>('/api/import/files', { method: 'POST', body: form })
+  },
+
+  riders() {
+    return json<RiderSummary[]>('/api/users')
+  },
+
+  createRider(name: string) {
+    return json<Rider>('/api/users', { method: 'POST', body: JSON.stringify({ name }) })
+  },
+
+  renameRider(id: number, name: string) {
+    return json<Rider>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+  },
+
+  /** Deletes the rider with all their routes. */
+  async deleteRider(id: number) {
+    await send(`/api/users/${id}`, { method: 'DELETE' })
+  },
+
+  session() {
+    return json<{ user: Rider | null }>('/api/session')
+  },
+
+  chooseRider(userId: number) {
+    return json<{ user: Rider }>('/api/session', { method: 'PUT', body: JSON.stringify({ userId }) })
   },
 
   komootStatus() {

@@ -5,6 +5,7 @@ import app.trailplan.routes.RouteRepository;
 import app.trailplan.routes.RouteSource;
 import app.trailplan.routing.TrackPoint;
 import app.trailplan.routing.TrackStats;
+import app.trailplan.users.CurrentUser;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -34,13 +35,14 @@ public class FileImportService {
     this.clock = clock;
   }
 
-  public ImportResult importFile(String fileName, byte[] data) {
+  public ImportResult importFile(CurrentUser user, String fileName, byte[] data) {
     String safeName = fileName == null || fileName.isBlank() ? "route" : fileName;
     try {
       String externalId = "file:" + sha256(data);
-      Optional<Long> existing = routes.findActiveIdByExternalId(externalId);
+      Optional<Long> existing = routes.findActiveIdByExternalId(user.id(), externalId);
       if (existing.isPresent()) {
-        String name = routes.findById(existing.get()).map(r -> r.name()).orElse(safeName);
+        String name =
+            routes.findById(user.id(), existing.get()).map(r -> r.name()).orElse(safeName);
         return new ImportResult(
             safeName,
             ImportResult.Status.ALREADY_IMPORTED,
@@ -58,6 +60,7 @@ public class FileImportService {
       String name = routeName(track.name(), safeName);
       long id =
           routes.insertImported(
+              user.id(),
               new ImportedRoute(
                   name,
                   isFit ? RouteSource.FIT : RouteSource.GPX,

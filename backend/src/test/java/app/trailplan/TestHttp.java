@@ -33,4 +33,19 @@ public final class TestHttp {
     }
     return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
   }
+
+  /** Creates a rider and chooses it for this client (the cookie is kept). Returns its id. */
+  public long chooseNewRider(String name) throws Exception {
+    String body = send("POST", "/api/users", "{\"name\":\"" + name + "\"}").body();
+    long id = Long.parseLong(body.replaceAll(".*\"id\":(\\d+).*", "$1"));
+    choose(id);
+    return id;
+  }
+
+  public void choose(long riderId) throws Exception {
+    HttpResponse<String> response = send("PUT", "/api/session", "{\"userId\":" + riderId + "}");
+    if (response.statusCode() != 200) {
+      throw new IllegalStateException("Choosing rider failed: " + response.body());
+    }
+  }
 }

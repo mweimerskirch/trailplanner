@@ -57,8 +57,8 @@ public class WahooClient {
     return config.enabled() && !config.clientId().isBlank() && !config.clientSecret().isBlank();
   }
 
-  public boolean connected() {
-    return tokens.find().isPresent();
+  public boolean connected(long userId) {
+    return tokens.find(userId).isPresent();
   }
 
   public String authorizationUrl(String state) {
@@ -75,7 +75,7 @@ public class WahooClient {
         .toUriString();
   }
 
-  public void exchangeCode(String code) {
+  public void exchangeCode(long userId, String code) {
     requireEnabled();
     MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
     form.add("client_id", config.clientId());
@@ -83,11 +83,11 @@ public class WahooClient {
     form.add("grant_type", "authorization_code");
     form.add("redirect_uri", config.redirectUri().toString());
     form.add("code", code);
-    tokens.save(requestToken(form));
+    tokens.save(userId, requestToken(form));
   }
 
-  public void disconnect() {
-    tokens.delete();
+  public void disconnect(long userId) {
+    tokens.delete(userId);
   }
 
   /**
@@ -96,9 +96,9 @@ public class WahooClient {
    * @return the Wahoo route id
    * @throws CloudRouteGoneException if {@code existing} no longer exists at Wahoo
    */
-  public long uploadRoute(StoredRoute route, Optional<Long> existing) {
+  public long uploadRoute(long userId, StoredRoute route, Optional<Long> existing) {
     requireEnabled();
-    String token = validAccessToken();
+    String token = validAccessToken(userId);
     MultiValueMap<String, String> form = routeForm(route);
     try {
       JsonNode response;
@@ -155,10 +155,10 @@ public class WahooClient {
     return form;
   }
 
-  private String validAccessToken() {
+  private String validAccessToken(long userId) {
     WahooToken token =
         tokens
-            .find()
+            .find(userId)
             .orElseThrow(
                 () -> new WahooException(HttpStatus.CONFLICT, "Connect your Wahoo account first."));
     if (!token.expiresWithin(Duration.ofMinutes(2), clock.instant())) {
@@ -171,7 +171,7 @@ public class WahooClient {
     form.add("refresh_token", token.refreshToken());
     // Wahoo invalidates the old refresh token, so always store the new pair immediately.
     WahooToken refreshed = requestToken(form);
-    tokens.save(refreshed);
+    tokens.save(userId, refreshed);
     return refreshed.accessToken();
   }
 

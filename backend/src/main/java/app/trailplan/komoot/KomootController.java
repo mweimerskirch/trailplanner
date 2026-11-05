@@ -1,6 +1,7 @@
 package app.trailplan.komoot;
 
 import app.trailplan.imports.ImportResult;
+import app.trailplan.users.CurrentUser;
 import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -60,14 +61,14 @@ public class KomootController {
   }
 
   @GetMapping("/tours")
-  public List<KomootImportService.TourEntry> tours(HttpSession session) {
-    return imports.tours(requireLogin(session));
+  public List<KomootImportService.TourEntry> tours(CurrentUser user, HttpSession session) {
+    return imports.tours(user, requireLogin(session));
   }
 
   @PostMapping("/import")
   public List<ImportResult> importTours(
-      @Valid @RequestBody ImportRequest request, HttpSession session) {
-    return imports.importTours(requireLogin(session), request.tourIds());
+      CurrentUser user, @Valid @RequestBody ImportRequest request, HttpSession session) {
+    return imports.importTours(user, requireLogin(session), request.tourIds());
   }
 
   private static KomootClient.Session requireLogin(HttpSession session) {

@@ -5,6 +5,7 @@ import app.trailplan.routes.ImportedRoute;
 import app.trailplan.routes.RouteRepository;
 import app.trailplan.routes.RouteSource;
 import app.trailplan.routing.TrackStats;
+import app.trailplan.users.CurrentUser;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.HashSet;
@@ -40,8 +41,9 @@ public class KomootImportService {
     this.clock = clock;
   }
 
-  public List<TourEntry> tours(KomootClient.Session session) {
-    Set<String> imported = new HashSet<>(routes.findActiveExternalIds(EXTERNAL_ID_PREFIX));
+  public List<TourEntry> tours(CurrentUser user, KomootClient.Session session) {
+    Set<String> imported =
+        new HashSet<>(routes.findActiveExternalIds(user.id(), EXTERNAL_ID_PREFIX));
     return komoot.tours(session).stream()
         .map(t ->
             new TourEntry(
@@ -56,16 +58,17 @@ public class KomootImportService {
         .toList();
   }
 
-  public List<ImportResult> importTours(KomootClient.Session session, List<Long> tourIds) {
-    return tourIds.stream().map(id -> importTour(session, id)).toList();
+  public List<ImportResult> importTours(
+      CurrentUser user, KomootClient.Session session, List<Long> tourIds) {
+    return tourIds.stream().map(id -> importTour(user, session, id)).toList();
   }
 
-  private ImportResult importTour(KomootClient.Session session, long tourId) {
+  private ImportResult importTour(CurrentUser user, KomootClient.Session session, long tourId) {
     String source = Long.toString(tourId);
     String externalId = EXTERNAL_ID_PREFIX + tourId;
-    var existing = routes.findActiveIdByExternalId(externalId);
+    var existing = routes.findActiveIdByExternalId(user.id(), externalId);
     if (existing.isPresent()) {
-      String name = routes.findById(existing.get()).map(r -> r.name()).orElse(source);
+      String name = routes.findById(user.id(), existing.get()).map(r -> r.name()).orElse(source);
       return new ImportResult(
           source,
           ImportResult.Status.ALREADY_IMPORTED,
@@ -105,6 +108,7 @@ public class KomootImportService {
               : TrackStats.descent(track.points());
       long id =
           routes.insertImported(
+              user.id(),
               new ImportedRoute(
                   name, RouteSource.KOMOOT, externalId, track.points(), distance, ascent, descent),
               clock.instant());

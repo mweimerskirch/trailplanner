@@ -1,5 +1,6 @@
 package app.trailplan.imports;
 
+import app.trailplan.users.CurrentUser;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.util.List;
@@ -21,13 +22,14 @@ public class ImportController {
 
   /** Imports GPX/FIT files (form field {@code files}); one result per file, in order. */
   @PostMapping("/files")
-  public List<ImportResult> importFiles(@RequestParam("files") List<MultipartFile> upload) {
-    return upload.stream().map(this::importOne).toList();
+  public List<ImportResult> importFiles(
+      CurrentUser user, @RequestParam("files") List<MultipartFile> upload) {
+    return upload.stream().map(file -> importOne(user, file)).toList();
   }
 
-  private ImportResult importOne(MultipartFile file) {
+  private ImportResult importOne(CurrentUser user, MultipartFile file) {
     try {
-      return files.importFile(file.getOriginalFilename(), file.getBytes());
+      return files.importFile(user, file.getOriginalFilename(), file.getBytes());
     } catch (IOException e) {
       throw new UncheckedIOException(e);
     }

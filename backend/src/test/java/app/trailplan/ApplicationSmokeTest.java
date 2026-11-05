@@ -10,9 +10,6 @@ import app.trailplan.routing.PlannedRoute;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrackPoint;
 import java.io.IOException;
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -42,11 +39,9 @@ class ApplicationSmokeTest {
   @LocalServerPort int port;
   @Autowired RouteRepository repository;
 
-  private final HttpClient http = HttpClient.newHttpClient();
-
   @Test
-  void servesDefaultPreferences() throws Exception {
-    HttpResponse<String> response = get("/api/routing/preferences/defaults");
+  void servesDefaultPreferencesWithoutARider() throws Exception {
+    HttpResponse<String> response = new TestHttp(port).get("/api/routing/preferences/defaults");
 
     assertThat(response.statusCode()).isEqualTo(200);
     assertThat(response.body())
@@ -57,6 +52,8 @@ class ApplicationSmokeTest {
 
   @Test
   void savedRoutesUseIsoTimestampsAndExplicitNulls() throws Exception {
+    TestHttp http = new TestHttp(port);
+    long rider = http.chooseNewRider("Smoke");
     List<GeoPoint> waypoints = List.of(new GeoPoint(49.61, 6.13), new GeoPoint(49.62, 6.14));
     PlannedRoute planned =
         new PlannedRoute(
@@ -67,51 +64,45 @@ class ApplicationSmokeTest {
             LegBreakdown.empty());
     long id =
         repository.insert(
+            rider,
             new RouteDraft("Smoke test", waypoints, RoutingPreferences.defaults()),
             planned,
             Instant.parse("2026-01-02T03:04:05Z"));
 
-    HttpResponse<String> response = get("/api/routes/" + id);
+    HttpResponse<String> response = http.get("/api/routes/" + id);
 
     assertThat(response.statusCode()).isEqualTo(200);
     assertThat(response.body())
         .contains("\"name\":\"Smoke test\"")
         .contains("\"updatedAt\":\"2026-01-02T03:04:05Z\"")
         .contains("\"deletedAt\":null");
-    assertThat(get("/api/routes/" + id + "/export/gpx").body())
+    assertThat(http.get("/api/routes/" + id + "/export/gpx").body())
         .contains("<trkpt lat=\"49.610000\"");
-    HttpResponse<String> fit = get("/api/routes/" + id + "/export/fit");
+    HttpResponse<String> fit = http.get("/api/routes/" + id + "/export/fit");
     assertThat(fit.headers().firstValue("Content-Disposition"))
         .hasValueSatisfying(v -> assertThat(v).contains("Smoke_test.fit"));
     assertThat(fit.body().substring(8, 12)).isEqualTo(".FIT");
-    assertThat(get("/api/routes/" + id + "/export/kml").statusCode()).isEqualTo(400);
+    assertThat(http.get("/api/routes/" + id + "/export/kml").statusCode()).isEqualTo(400);
   }
 
   @Test
   void reportsProblemsAsProblemDetails() throws Exception {
-    HttpResponse<String> missing = get("/api/routes/999999");
+    TestHttp http = new TestHttp(port);
+
+    HttpResponse<String> noRider = http.get("/api/routes");
+    assertThat(noRider.statusCode()).isEqualTo(401);
+    assertThat(noRider.body()).contains("\"reason\":\"NO_USER\"");
+
+    http.chooseNewRider("Problems");
+    HttpResponse<String> missing = http.get("/api/routes/999999");
     assertThat(missing.statusCode()).isEqualTo(404);
     assertThat(missing.body()).contains("Route 999999 does not exist.");
 
     HttpResponse<String> invalid =
         http.send(
-            HttpRequest.newBuilder(uri("/api/routing/leg"))
-                .header("Content-Type", "application/json")
-                .POST(
-                    HttpRequest.BodyPublishers.ofString(
-                        "{\"from\":{\"lat\":91,\"lng\":6},\"to\":{\"lat\":49,\"lng\":6},"
-                            + "\"preferences\":{}}"))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+            "POST",
+            "/api/routing/leg",
+            "{\"from\":{\"lat\":91,\"lng\":6},\"to\":{\"lat\":49,\"lng\":6},\"preferences\":{}}");
     assertThat(invalid.statusCode()).isEqualTo(400);
-  }
-
-  private HttpResponse<String> get(String path) throws Exception {
-    return http.send(
-        HttpRequest.newBuilder(uri(path)).GET().build(), HttpResponse.BodyHandlers.ofString());
-  }
-
-  private URI uri(String path) {
-    return URI.create("http://localhost:" + port + path);
   }
 }

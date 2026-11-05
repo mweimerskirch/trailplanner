@@ -2,6 +2,7 @@ package app.trailplan.wahoo;
 
 import app.trailplan.devices.CloudSync;
 import app.trailplan.routes.StoredRoute;
+import app.trailplan.users.CurrentUser;
 import java.util.Optional;
 import org.springframework.stereotype.Component;
 
@@ -31,8 +32,8 @@ public class WahooCloudSync implements CloudSync {
   }
 
   @Override
-  public boolean connected() {
-    return wahoo.connected();
+  public boolean connected(CurrentUser user) {
+    return wahoo.connected(user.id());
   }
 
   @Override
@@ -41,12 +42,12 @@ public class WahooCloudSync implements CloudSync {
   }
 
   @Override
-  public void disconnect() {
-    wahoo.disconnect();
+  public void disconnect(CurrentUser user) {
+    wahoo.disconnect(user.id());
   }
 
   @Override
-  public String upload(StoredRoute route, Optional<String> remoteId) {
-    return Long.toString(wahoo.uploadRoute(route, remoteId.map(Long::valueOf)));
+  public String upload(CurrentUser user, StoredRoute route, Optional<String> remoteId) {
+    return Long.toString(wahoo.uploadRoute(user.id(), route, remoteId.map(Long::valueOf)));
   }
 }

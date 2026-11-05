@@ -17,7 +17,10 @@ import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-/** Routes in SQLite. Trashed routes keep their row with {@code deleted_at} set. */
+/**
+ * Routes in SQLite. Every method is scoped to one rider ({@code userId}): a route of another rider
+ * is treated as if it did not exist. Trashed routes keep their row with {@code deleted_at} set.
+ */
 @Repository
 public class RouteRepository {
 
@@ -40,54 +43,65 @@ public class RouteRepository {
   }
 
   /** Routes in the library, most recently changed first. */
-  public List<RouteSummary> findActiveSummaries() {
+  public List<RouteSummary> findActiveSummaries(long userId) {
     return jdbc.sql(
             "SELECT "
                 + SUMMARY_COLUMNS
-                + " FROM route WHERE deleted_at IS NULL ORDER BY updated_at DESC")
+                + " FROM route WHERE user_id = :user AND deleted_at IS NULL ORDER BY updated_at DESC")
+        .param("user", userId)
         .query(RouteRepository::mapSummary)
         .list();
   }
 
   /** Routes in the trash, most recently deleted first. */
-  public List<RouteSummary> findTrashedSummaries() {
+  public List<RouteSummary> findTrashedSummaries(long userId) {
     return jdbc.sql(
             "SELECT "
                 + SUMMARY_COLUMNS
-                + " FROM route WHERE deleted_at IS NOT NULL ORDER BY deleted_at DESC")
+                + " FROM route WHERE user_id = :user AND deleted_at IS NOT NULL"
+                + " ORDER BY deleted_at DESC")
+        .param("user", userId)
         .query(RouteRepository::mapSummary)
         .list();
   }
 
-  public Optional<StoredRoute> findById(long id) {
-    return jdbc.sql("SELECT * FROM route WHERE id = :id")
+  public Optional<StoredRoute> findById(long userId, long id) {
+    return jdbc.sql("SELECT * FROM route WHERE id = :id AND user_id = :user")
         .param("id", id)
+        .param("user", userId)
         .query(this::map)
         .optional();
   }
 
   /** The id of a route in the library (not the trash) imported from this source, if any. */
-  public Optional<Long> findActiveIdByExternalId(String externalId) {
-    return jdbc.sql("SELECT id FROM route WHERE external_id = :eid AND deleted_at IS NULL LIMIT 1")
+  public Optional<Long> findActiveIdByExternalId(long userId, String externalId) {
+    return jdbc.sql(
+            """
+            SELECT id FROM route
+            WHERE user_id = :user AND external_id = :eid AND deleted_at IS NULL LIMIT 1
+            """)
+        .param("user", userId)
         .param("eid", externalId)
         .query(Long.class)
         .optional();
   }
 
   /** External ids of all routes in the library (not the trash) that start with this prefix. */
-  public List<String> findActiveExternalIds(String prefix) {
+  public List<String> findActiveExternalIds(long userId, String prefix) {
     return jdbc.sql(
             """
             SELECT external_id FROM route
-            WHERE deleted_at IS NULL AND external_id LIKE :prefix || '%'
+            WHERE user_id = :user AND deleted_at IS NULL AND external_id LIKE :prefix || '%'
             """)
+        .param("user", userId)
         .param("prefix", prefix)
         .query(String.class)
         .list();
   }
 
-  public long insert(RouteDraft draft, PlannedRoute planned, Instant now) {
+  public long insert(long userId, RouteDraft draft, PlannedRoute planned, Instant now) {
     return insert(
+        userId,
         draft.name(),
         write(draft.waypoints()),
         write(draft.preferences()),
@@ -101,8 +115,9 @@ public class RouteRepository {
   }
 
   /** Stores an imported track as-is; it gets waypoints only when the rider converts it. */
-  public long insertImported(ImportedRoute route, Instant now) {
+  public long insertImported(long userId, ImportedRoute route, Instant now) {
     return insert(
+        userId,
         route.name(),
         write(List.of()),
         write(RoutingPreferences.defaults()),
@@ -116,6 +131,7 @@ public class RouteRepository {
   }
 
   private long insert(
+      long userId,
       String name,
       String waypoints,
       String preferences,
@@ -131,10 +147,11 @@ public class RouteRepository {
             """
             INSERT INTO route (name, waypoints_json, preferences_json, track_json,
                                distance_m, ascent_m, descent_m, created_at, updated_at,
-                               source, external_id)
+                               source, external_id, user_id)
             VALUES (:name, :waypoints, :preferences, :track,
-                    :distance, :ascent, :descent, :now, :now, :source, :externalId)
+                    :distance, :ascent, :descent, :now, :now, :source, :externalId, :user)
             """)
+        .param("user", userId)
         .param("name", name)
         .param("waypoints", waypoints)
         .param("preferences", preferences)
@@ -149,15 +166,16 @@ public class RouteRepository {
     return generatedId(keys);
   }
 
-  public boolean update(long id, RouteDraft draft, PlannedRoute planned, Instant now) {
+  public boolean update(long userId, long id, RouteDraft draft, PlannedRoute planned, Instant now) {
     return jdbc.sql(
                 """
                 UPDATE route SET name = :name, waypoints_json = :waypoints,
                   preferences_json = :preferences, track_json = :track, distance_m = :distance,
                   ascent_m = :ascent, descent_m = :descent, updated_at = :now
-                WHERE id = :id
+                WHERE id = :id AND user_id = :user
                 """)
             .param("id", id)
+            .param("user", userId)
             .param("name", draft.name())
             .param("waypoints", write(draft.waypoints()))
             .param("preferences", write(draft.preferences()))
@@ -170,9 +188,11 @@ public class RouteRepository {
         == 1;
   }
 
-  public boolean rename(long id, String name, Instant now) {
-    return jdbc.sql("UPDATE route SET name = :name, updated_at = :now WHERE id = :id")
+  public boolean rename(long userId, long id, String name, Instant now) {
+    return jdbc.sql(
+                "UPDATE route SET name = :name, updated_at = :now WHERE id = :id AND user_id = :user")
             .param("id", id)
+            .param("user", userId)
             .param("name", name)
             .param("now", now.toString())
             .update()
@@ -185,19 +205,20 @@ public class RouteRepository {
    *
    * @return the id of the copy, or empty if the original does not exist
    */
-  public Optional<Long> duplicate(long id, String name, Instant now) {
+  public Optional<Long> duplicate(long userId, long id, String name, Instant now) {
     KeyHolder keys = new GeneratedKeyHolder();
     int rows =
         jdbc.sql(
                 """
                 INSERT INTO route (name, waypoints_json, preferences_json, track_json,
                                    distance_m, ascent_m, descent_m, created_at, updated_at,
-                                   source, external_id)
+                                   source, external_id, user_id)
                 SELECT :name, waypoints_json, preferences_json, track_json,
-                       distance_m, ascent_m, descent_m, :now, :now, source, NULL
-                FROM route WHERE id = :id
+                       distance_m, ascent_m, descent_m, :now, :now, source, NULL, user_id
+                FROM route WHERE id = :id AND user_id = :user
                 """)
             .param("id", id)
+            .param("user", userId)
             .param("name", name)
             .param("now", now.toString())
             .update(keys);
@@ -205,29 +226,45 @@ public class RouteRepository {
   }
 
   /** Moves a route to the trash. False if it does not exist or is already there. */
-  public boolean moveToTrash(long id, Instant now) {
-    return jdbc.sql("UPDATE route SET deleted_at = :now WHERE id = :id AND deleted_at IS NULL")
+  public boolean moveToTrash(long userId, long id, Instant now) {
+    return jdbc.sql(
+                """
+                UPDATE route SET deleted_at = :now
+                WHERE id = :id AND user_id = :user AND deleted_at IS NULL
+                """)
             .param("id", id)
+            .param("user", userId)
             .param("now", now.toString())
             .update()
         == 1;
   }
 
   /** Takes a route out of the trash. False if it does not exist or is not in the trash. */
-  public boolean restore(long id) {
-    return jdbc.sql("UPDATE route SET deleted_at = NULL WHERE id = :id AND deleted_at IS NOT NULL")
+  public boolean restore(long userId, long id) {
+    return jdbc.sql(
+                """
+                UPDATE route SET deleted_at = NULL
+                WHERE id = :id AND user_id = :user AND deleted_at IS NOT NULL
+                """)
             .param("id", id)
+            .param("user", userId)
             .update()
         == 1;
   }
 
-  public boolean deletePermanently(long id) {
-    return jdbc.sql("DELETE FROM route WHERE id = :id").param("id", id).update() == 1;
+  public boolean deletePermanently(long userId, long id) {
+    return jdbc.sql("DELETE FROM route WHERE id = :id AND user_id = :user")
+            .param("id", id)
+            .param("user", userId)
+            .update()
+        == 1;
   }
 
   /** Deletes every route in the trash for good and returns how many there were. */
-  public int emptyTrash() {
-    return jdbc.sql("DELETE FROM route WHERE deleted_at IS NOT NULL").update();
+  public int emptyTrash(long userId) {
+    return jdbc.sql("DELETE FROM route WHERE user_id = :user AND deleted_at IS NOT NULL")
+        .param("user", userId)
+        .update();
   }
 
   private static RouteSummary mapSummary(ResultSet rs, int row) throws SQLException {

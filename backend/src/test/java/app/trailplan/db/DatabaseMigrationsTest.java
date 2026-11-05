@@ -65,7 +65,12 @@ class DatabaseMigrationsTest {
   void upgradesALegacyDatabaseAndKeepsItsRoutes() throws Exception {
     assertThat(migrations.currentVersion()).isEqualTo(DatabaseMigrations.MIGRATIONS.size());
 
-    String library = new TestHttp(port).get("/api/routes").body();
+    TestHttp http = new TestHttp(port);
+    // Migration 4 gives existing data to a first rider called "Rider".
+    assertThat(http.get("/api/users").body())
+        .isEqualTo("[{\"id\":1,\"name\":\"Rider\",\"routes\":1}]");
+    http.choose(1);
+    String library = http.get("/api/routes").body();
     assertThat(library)
         .contains("\"name\":\"Old route\"")
         .contains("\"source\":\"PLANNER\"")

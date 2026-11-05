@@ -1,5 +1,6 @@
 package app.trailplan.devices;
 
+import app.trailplan.users.CurrentUser;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -22,19 +23,20 @@ public class DeviceController {
 
   /** All supported devices with their formats, instructions and cloud status. */
   @GetMapping
-  public List<DeviceService.DeviceInfo> list() {
-    return devices.devices();
+  public List<DeviceService.DeviceInfo> list(CurrentUser user) {
+    return devices.devices(user);
   }
 
   /** Sends a saved route to the device maker's cloud account. */
   @PostMapping("/{deviceId}/cloud/routes/{routeId}")
-  public DeviceService.SyncResult send(@PathVariable String deviceId, @PathVariable long routeId) {
-    return devices.send(deviceId, routeId);
+  public DeviceService.SyncResult send(
+      CurrentUser user, @PathVariable String deviceId, @PathVariable long routeId) {
+    return devices.send(user, deviceId, routeId);
   }
 
   @DeleteMapping("/{deviceId}/cloud/connection")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void disconnect(@PathVariable String deviceId) {
-    devices.disconnect(deviceId);
+  public void disconnect(CurrentUser user, @PathVariable String deviceId) {
+    devices.disconnect(user, deviceId);
   }
 }

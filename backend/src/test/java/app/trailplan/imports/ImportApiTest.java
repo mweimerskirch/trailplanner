@@ -35,9 +35,12 @@ class ImportApiTest {
       """;
 
   @LocalServerPort int port;
+  private final HttpClient client =
+      HttpClient.newBuilder().cookieHandler(new java.net.CookieManager()).build();
 
   @Test
   void importsFilesReportsDuplicatesAndFailures() throws Exception {
+    choose(new app.trailplan.TestHttp(port));
     HttpResponse<String> first =
         upload(new String[] {"tour.gpx", GPX}, new String[] {"notes.txt", "hello"});
 
@@ -57,7 +60,7 @@ class ImportApiTest {
   }
 
   private String get(String path) throws Exception {
-    return HttpClient.newHttpClient()
+    return client
         .send(
             HttpRequest.newBuilder(URI.create("http://localhost:" + port + path)).build(),
             HttpResponse.BodyHandlers.ofString())
@@ -79,12 +82,31 @@ class ImportApiTest {
               .getBytes(StandardCharsets.UTF_8));
     }
     body.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
-    return HttpClient.newHttpClient()
-        .send(
-            HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/import/files"))
-                .header("Content-Type", "multipart/form-data; boundary=" + boundary)
-                .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
-                .build(),
-            HttpResponse.BodyHandlers.ofString());
+    return client.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/import/files"))
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+  }
+
+  /** Creates a rider with a helper client and hands its cookie to this test's client. */
+  private void choose(app.trailplan.TestHttp helper) throws Exception {
+    String body =
+        client
+            .send(
+                HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users"))
+                    .header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"Importer\"}"))
+                    .build(),
+                HttpResponse.BodyHandlers.ofString())
+            .body();
+    String id = body.replaceAll(".*\"id\":(\\d+).*", "$1");
+    client.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/session"))
+            .header("Content-Type", "application/json")
+            .PUT(HttpRequest.BodyPublishers.ofString("{\"userId\":" + id + "}"))
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
   }
 }

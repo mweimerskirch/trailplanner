@@ -90,8 +90,9 @@ class DeviceApiTest {
   @Autowired CloudLinkRepository links;
   @Autowired JdbcClient jdbc;
 
-  private long route() {
+  private long route(long rider) {
     return routes.insert(
+        rider,
         new RouteDraft(
             "Tour",
             List.of(new GeoPoint(49.61, 6.13), new GeoPoint(49.62, 6.14)),
@@ -108,8 +109,10 @@ class DeviceApiTest {
   @Test
   void listsDevicesAndSendsRoutesToTheCloud() throws Exception {
     TestHttp http = new TestHttp(port);
+    long rider = http.chooseNewRider("Wahoo rider");
     jdbc.sql(
-            "INSERT OR REPLACE INTO wahoo_token VALUES (1, 'access', 'refresh', '2099-01-01T00:00:00Z')")
+            "INSERT OR REPLACE INTO wahoo_token VALUES (:user, 'access', 'refresh', '2099-01-01T00:00:00Z')")
+        .param("user", rider)
         .update();
 
     String devices = http.get("/api/devices").body();
@@ -123,7 +126,7 @@ class DeviceApiTest {
                 + "\"connectPath\":\"/api/wahoo/connect\"}")
         .contains("\"title\":\"Copy over USB\"");
 
-    long id = route();
+    long id = route(rider);
     assertThat(http.send("POST", "/api/devices/wahoo-elemnt/cloud/routes/" + id, null).body())
         .contains("\"service\":\"wahoo\",\"remoteId\":\"555\"");
 
@@ -139,11 +142,11 @@ class DeviceApiTest {
     assertThat(links.findRemoteId(id, "wahoo")).contains("556");
 
     // A copy is a new route at Wahoo, not an update of the original's.
-    long copy = routes.duplicate(id, "Tour (copy)", Instant.now()).orElseThrow();
+    long copy = routes.duplicate(rider, id, "Tour (copy)", Instant.now()).orElseThrow();
     assertThat(links.findRemoteId(copy, "wahoo")).isEmpty();
 
     // Links go with their route.
-    routes.deletePermanently(id);
+    routes.deletePermanently(rider, id);
     assertThat(links.findRemoteId(id, "wahoo")).isEmpty();
 
     assertThat(http.send("POST", "/api/devices/generic/cloud/routes/" + copy, null).statusCode())

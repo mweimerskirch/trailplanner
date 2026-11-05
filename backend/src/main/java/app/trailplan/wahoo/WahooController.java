@@ -1,6 +1,7 @@
 package app.trailplan.wahoo;
 
 import app.trailplan.config.TrailplanProperties;
+import app.trailplan.users.CurrentUser;
 import jakarta.servlet.http.HttpSession;
 import java.net.URI;
 import java.security.SecureRandom;
@@ -23,6 +24,9 @@ public class WahooController {
   private static final Logger log = LoggerFactory.getLogger(WahooController.class);
   private static final String STATE_ATTRIBUTE = "wahoo-oauth-state";
 
+  /** The rider who started the login; the token is stored for them when Wahoo redirects back. */
+  private static final String USER_ATTRIBUTE = "wahoo-oauth-user";
+
   private final WahooClient wahoo;
   private final URI publicUrl;
   private final SecureRandom random = new SecureRandom();
@@ -34,11 +38,12 @@ public class WahooController {
 
   /** Starts the OAuth flow; the browser navigates here directly. */
   @GetMapping("/api/wahoo/connect")
-  public ResponseEntity<Void> connect(HttpSession session) {
+  public ResponseEntity<Void> connect(CurrentUser user, HttpSession session) {
     byte[] bytes = new byte[24];
     random.nextBytes(bytes);
     String state = HexFormat.of().formatHex(bytes);
     session.setAttribute(STATE_ATTRIBUTE, state);
+    session.setAttribute(USER_ATTRIBUTE, user.id());
     return redirect(URI.create(wahoo.authorizationUrl(state)));
   }
 
@@ -49,12 +54,18 @@ public class WahooController {
       @RequestParam(required = false) String error,
       HttpSession session) {
     Object expected = session.getAttribute(STATE_ATTRIBUTE);
+    Object userId = session.getAttribute(USER_ATTRIBUTE);
     session.removeAttribute(STATE_ATTRIBUTE);
-    if (error != null || code == null || state == null || !state.equals(expected)) {
+    session.removeAttribute(USER_ATTRIBUTE);
+    if (error != null
+        || code == null
+        || state == null
+        || !state.equals(expected)
+        || !(userId instanceof Long rider)) {
       return redirect(publicUrl.resolve("/?wahoo=failed"));
     }
     try {
-      wahoo.exchangeCode(code);
+      wahoo.exchangeCode(rider, code);
     } catch (WahooException e) {
       // The browser is mid-redirect here: send it back to the planner, not to a JSON error page.
       log.warn("Wahoo token exchange failed: {}", e.getMessage(), e.getCause());

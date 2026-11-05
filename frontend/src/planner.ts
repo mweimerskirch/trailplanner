@@ -46,7 +46,10 @@ export interface StatusMessage {
   kind: 'info' | 'error'
 }
 
-const STORAGE_KEY = 'trailplan.planner'
+/** Planner state is stored per rider: `trailplan.planner.<riderId>`. */
+const STORAGE_PREFIX = 'trailplan.planner.'
+/** Where the state lived before there were riders; it moves to the first rider who opens it. */
+const LEGACY_STORAGE_KEY = 'trailplan.planner'
 const MAX_HISTORY = 80
 const MAX_PARALLEL_LEGS = 3
 const MAX_CACHED_LEGS = 500
@@ -60,9 +63,14 @@ interface StoredState {
   fixedTrack?: FixedTrack | null
 }
 
-function loadStored(): StoredState {
+function loadStored(key: string): StoredState {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
+    let raw = localStorage.getItem(key)
+    const legacy = localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (raw === null && legacy !== null) {
+      raw = legacy
+      localStorage.removeItem(LEGACY_STORAGE_KEY)
+    }
     return raw ? (JSON.parse(raw) as StoredState) : {}
   } catch {
     return {}
@@ -77,17 +85,18 @@ function mergePreferences(stored: Partial<RoutingPreferences> | undefined): Rout
   }
 }
 
-const stored = loadStored()
+/** Storage key of the active rider; null until a rider is chosen (nothing is saved before). */
+let storageKey: string | null = null
 
-export const waypoints = ref<GeoPoint[]>(stored.waypoints ?? [])
-export const preferences = ref<RoutingPreferences>(mergePreferences(stored.preferences))
-export const routeName = ref(stored.routeName ?? 'MTB tour')
+export const waypoints = ref<GeoPoint[]>([])
+export const preferences = ref<RoutingPreferences>(mergePreferences(undefined))
+export const routeName = ref('MTB tour')
 /** Id of the saved route being edited, or null for a new, unsaved route. */
-export const routeId = ref<number | null>(stored.routeId ?? null)
+export const routeId = ref<number | null>(null)
 /** Average speed on the flat in km/h, for the time estimate only. */
-export const speed = ref(stored.speed ?? 16)
+export const speed = ref(16)
 /** Set while an imported, not yet converted route is open (view mode). */
-export const fixedTrack = shallowRef<FixedTrack | null>(stored.fixedTrack ?? null)
+export const fixedTrack = shallowRef<FixedTrack | null>(null)
 export const viewOnly = computed(() => fixedTrack.value !== null)
 
 export const legs = shallowRef<LegState[]>([])
@@ -120,6 +129,7 @@ export const canUndo = ref(false)
 watch(
   [waypoints, preferences, routeName, routeId, speed, fixedTrack],
   () => {
+    if (!storageKey) return
     const state: StoredState = {
       waypoints: waypoints.value,
       preferences: preferences.value,
@@ -129,7 +139,7 @@ watch(
       fixedTrack: fixedTrack.value,
     }
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(state))
+      localStorage.setItem(storageKey, JSON.stringify(state))
     } catch {
       // Storage full or disabled: the planner still works, it just won't survive a reload.
     }
@@ -144,6 +154,29 @@ export function setStatus(text: string | null, kind: StatusMessage['kind'] = 'in
       if (status.value?.text === text) status.value = null
     }, clearAfterMs)
   }
+}
+
+/**
+ * Switches the planner to a rider's own state (waypoints, preferences, open route), as it was
+ * when they last used this browser. Undo history does not carry over between riders.
+ */
+export function activateRider(riderId: number) {
+  const key = STORAGE_PREFIX + String(riderId)
+  if (storageKey === key) return
+  storageKey = key
+  const stored = loadStored(key)
+  fixedTrack.value = stored.fixedTrack ?? null
+  waypoints.value = stored.waypoints ?? []
+  preferences.value = mergePreferences(stored.preferences)
+  routeName.value = stored.routeName ?? 'MTB tour'
+  routeId.value = stored.routeId ?? null
+  speed.value = stored.speed ?? 16
+  history.length = 0
+  canUndo.value = false
+  status.value = null
+  hoverIndex.value = null
+  libraryVersion.value++
+  fitRequest.value++
 }
 
 // ---------- editing ----------

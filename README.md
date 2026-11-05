@@ -39,7 +39,11 @@ changed tiles) and `docker compose restart brouter`.
 To cover other areas, pass tile names: `./scripts/download-segments.sh E5_N45 E10_N45`. A tile covers
 5×5 degrees; `E5_N45` is 5–10° east, 45–50° north.
 
-> **No login.** Trailplan is a single-user app without authentication. Run it on your own machine or
+**Riders.** On first start you add riders (just names). Each rider has their own library, trash,
+imports, Wahoo connection and planner state; the chosen rider is remembered per browser.
+
+> **No login.** Riders have no passwords and Trailplan has no authentication: everyone who can reach
+> it can open every rider's library. Run it on your own machine or
 > home network. If you expose it to the internet, put it behind a reverse proxy with authentication.
 
 ## Getting routes onto the BOLT

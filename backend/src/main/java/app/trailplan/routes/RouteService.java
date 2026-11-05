@@ -2,6 +2,7 @@ package app.trailplan.routes;
 
 import app.trailplan.routing.PlannedRoute;
 import app.trailplan.routing.RoutingService;
+import app.trailplan.users.CurrentUser;
 import java.time.Clock;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -22,72 +23,74 @@ public class RouteService {
     this.clock = clock;
   }
 
-  public List<RouteSummary> list() {
-    return repository.findActiveSummaries();
+  public List<RouteSummary> list(CurrentUser user) {
+    return repository.findActiveSummaries(user.id());
   }
 
-  public List<RouteSummary> trash() {
-    return repository.findTrashedSummaries();
+  public List<RouteSummary> trash(CurrentUser user) {
+    return repository.findTrashedSummaries(user.id());
   }
 
-  public StoredRoute get(long id) {
-    return repository.findById(id).orElseThrow(() -> new RouteNotFoundException(id));
+  /** The rider's route; routes of other riders are reported as not found. */
+  public StoredRoute get(CurrentUser user, long id) {
+    return repository.findById(user.id(), id).orElseThrow(() -> new RouteNotFoundException(id));
   }
 
-  public StoredRoute create(RouteDraft draft) {
+  public StoredRoute create(CurrentUser user, RouteDraft draft) {
     PlannedRoute planned = plan(draft);
-    long id = repository.insert(draft, planned, clock.instant());
-    return get(id);
+    long id = repository.insert(user.id(), draft, planned, clock.instant());
+    return get(user, id);
   }
 
   /** Saves new waypoints; for an imported route this is the conversion to an editable one. */
-  public StoredRoute update(long id, RouteDraft draft) {
+  public StoredRoute update(CurrentUser user, long id, RouteDraft draft) {
+    get(user, id); // 404 before spending time on routing
     PlannedRoute planned = plan(draft);
-    if (!repository.update(id, draft, planned, clock.instant())) {
+    if (!repository.update(user.id(), id, draft, planned, clock.instant())) {
       throw new RouteNotFoundException(id);
     }
-    return get(id);
+    return get(user, id);
   }
 
-  public StoredRoute rename(long id, String name) {
-    if (!repository.rename(id, name.strip(), clock.instant())) {
+  public StoredRoute rename(CurrentUser user, long id, String name) {
+    if (!repository.rename(user.id(), id, name.strip(), clock.instant())) {
       throw new RouteNotFoundException(id);
     }
-    return get(id);
+    return get(user, id);
   }
 
-  public StoredRoute duplicate(long id) {
-    String name = get(id).name();
+  public StoredRoute duplicate(CurrentUser user, long id) {
+    String name = get(user, id).name();
     int keep = Math.min(name.length(), MAX_NAME_LENGTH - COPY_SUFFIX.length());
     long copy =
         repository
-            .duplicate(id, name.substring(0, keep) + COPY_SUFFIX, clock.instant())
+            .duplicate(user.id(), id, name.substring(0, keep) + COPY_SUFFIX, clock.instant())
             .orElseThrow(() -> new RouteNotFoundException(id));
-    return get(copy);
+    return get(user, copy);
   }
 
   /** Moves the route to the trash. Deleting a route that is already in the trash is a no-op. */
-  public void moveToTrash(long id) {
-    if (!repository.moveToTrash(id, clock.instant())) {
-      get(id); // throws if the route does not exist at all
+  public void moveToTrash(CurrentUser user, long id) {
+    if (!repository.moveToTrash(user.id(), id, clock.instant())) {
+      get(user, id); // throws if the route does not exist at all
     }
   }
 
-  public StoredRoute restore(long id) {
-    if (!repository.restore(id)) {
-      get(id); // throws if the route does not exist at all
+  public StoredRoute restore(CurrentUser user, long id) {
+    if (!repository.restore(user.id(), id)) {
+      get(user, id); // throws if the route does not exist at all
     }
-    return get(id);
+    return get(user, id);
   }
 
-  public void deletePermanently(long id) {
-    if (!repository.deletePermanently(id)) {
+  public void deletePermanently(CurrentUser user, long id) {
+    if (!repository.deletePermanently(user.id(), id)) {
       throw new RouteNotFoundException(id);
     }
   }
 
-  public int emptyTrash() {
-    return repository.emptyTrash();
+  public int emptyTrash(CurrentUser user) {
+    return repository.emptyTrash(user.id());
   }
 
   /** Recalculates the track server-side so stored tracks always match waypoints and profile. */

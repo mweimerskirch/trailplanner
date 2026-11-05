@@ -1,5 +1,6 @@
 package app.trailplan.routes;
 
+import app.trailplan.users.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -33,64 +34,67 @@ public class RouteController {
   }
 
   @GetMapping("/routes")
-  public List<RouteSummary> list() {
-    return routes.list();
+  public List<RouteSummary> list(CurrentUser user) {
+    return routes.list(user);
   }
 
   @GetMapping("/routes/trash")
-  public List<RouteSummary> trash() {
-    return routes.trash();
+  public List<RouteSummary> trash(CurrentUser user) {
+    return routes.trash(user);
   }
 
   /** Deletes every route in the trash for good. */
   @DeleteMapping("/routes/trash")
-  public EmptyTrashResult emptyTrash() {
-    return new EmptyTrashResult(routes.emptyTrash());
+  public EmptyTrashResult emptyTrash(CurrentUser user) {
+    return new EmptyTrashResult(routes.emptyTrash(user));
   }
 
   @GetMapping("/routes/{id}")
-  public RouteDetails get(@PathVariable long id) {
-    return routes.get(id).details();
+  public RouteDetails get(CurrentUser user, @PathVariable long id) {
+    return routes.get(user, id).details();
   }
 
   @PostMapping("/routes")
-  public ResponseEntity<RouteDetails> create(@Valid @RequestBody RouteDraft draft) {
-    RouteDetails created = routes.create(draft).details();
+  public ResponseEntity<RouteDetails> create(
+      CurrentUser user, @Valid @RequestBody RouteDraft draft) {
+    RouteDetails created = routes.create(user, draft).details();
     return ResponseEntity.created(URI.create("/api/routes/" + created.id())).body(created);
   }
 
   @PutMapping("/routes/{id}")
-  public RouteDetails update(@PathVariable long id, @Valid @RequestBody RouteDraft draft) {
-    return routes.update(id, draft).details();
+  public RouteDetails update(
+      CurrentUser user, @PathVariable long id, @Valid @RequestBody RouteDraft draft) {
+    return routes.update(user, id, draft).details();
   }
 
   /** Renames without recalculating, so it also works for imported routes. */
   @PatchMapping("/routes/{id}")
-  public RouteDetails rename(@PathVariable long id, @Valid @RequestBody RenameRequest request) {
-    return routes.rename(id, request.name()).details();
+  public RouteDetails rename(
+      CurrentUser user, @PathVariable long id, @Valid @RequestBody RenameRequest request) {
+    return routes.rename(user, id, request.name()).details();
   }
 
   @PostMapping("/routes/{id}/duplicate")
-  public ResponseEntity<RouteDetails> duplicate(@PathVariable long id) {
-    RouteDetails copy = routes.duplicate(id).details();
+  public ResponseEntity<RouteDetails> duplicate(CurrentUser user, @PathVariable long id) {
+    RouteDetails copy = routes.duplicate(user, id).details();
     return ResponseEntity.created(URI.create("/api/routes/" + copy.id())).body(copy);
   }
 
   /** Moves the route to the trash; it can be restored until the trash is emptied. */
   @DeleteMapping("/routes/{id}")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void delete(@PathVariable long id) {
-    routes.moveToTrash(id);
+  public void delete(CurrentUser user, @PathVariable long id) {
+    routes.moveToTrash(user, id);
   }
 
   @PostMapping("/routes/{id}/restore")
-  public RouteDetails restore(@PathVariable long id) {
-    return routes.restore(id).details();
+  public RouteDetails restore(CurrentUser user, @PathVariable long id) {
+    return routes.restore(user, id).details();
   }
 
   @DeleteMapping("/routes/{id}/permanent")
   @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void deletePermanently(@PathVariable long id) {
-    routes.deletePermanently(id);
+  public void deletePermanently(CurrentUser user, @PathVariable long id) {
+    routes.deletePermanently(user, id);
   }
 }

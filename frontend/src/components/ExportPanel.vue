@@ -2,6 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '@/api'
 import * as planner from '@/planner'
+import { currentRider } from '@/session'
 import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
 
 const DEVICE_KEY = 'trailplan.device'
@@ -17,6 +18,10 @@ const ready = computed(() => !busy.value && planner.routeComplete.value)
 
 watch(deviceId, (id) => {
   localStorage.setItem(DEVICE_KEY, id)
+})
+// Cloud connections belong to the rider: reload when another rider is chosen.
+watch(currentRider, () => {
+  void loadDevices()
 })
 
 function fileName(format: FormatInfo) {

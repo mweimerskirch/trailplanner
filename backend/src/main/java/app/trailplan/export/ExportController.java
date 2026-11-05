@@ -4,6 +4,7 @@ import app.trailplan.routes.RouteDraft;
 import app.trailplan.routes.RouteService;
 import app.trailplan.routes.StoredRoute;
 import app.trailplan.routing.PlannedRoute;
+import app.trailplan.users.CurrentUser;
 import jakarta.validation.Valid;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -30,8 +31,9 @@ public class ExportController {
 
   /** A saved route, with its stored track (for imported routes: the original track). */
   @GetMapping("/routes/{id}/export/{format}")
-  public ResponseEntity<byte[]> saved(@PathVariable long id, @PathVariable String format) {
-    StoredRoute route = routes.get(id);
+  public ResponseEntity<byte[]> saved(
+      CurrentUser user, @PathVariable long id, @PathVariable String format) {
+    StoredRoute route = routes.get(user, id);
     return file(
         formats.get(format),
         new ExportedRoute(route.name(), route.track(), route.ascent(), route.descent()));

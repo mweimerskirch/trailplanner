@@ -4,6 +4,7 @@ import app.trailplan.export.RouteFormat;
 import app.trailplan.export.RouteFormats;
 import app.trailplan.routes.RouteService;
 import app.trailplan.routes.StoredRoute;
+import app.trailplan.users.CurrentUser;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -58,11 +59,11 @@ public class DeviceService {
     this.clock = clock;
   }
 
-  public List<DeviceInfo> devices() {
-    return devices.values().stream().map(this::info).toList();
+  public List<DeviceInfo> devices(CurrentUser user) {
+    return devices.values().stream().map(d -> info(user, d)).toList();
   }
 
-  public SyncResult send(String deviceId, long routeId) {
+  public SyncResult send(CurrentUser user, String deviceId, long routeId) {
     CloudSync cloud = cloud(deviceId);
     if (!cloud.enabled()) {
       throw new DeviceException(
@@ -70,27 +71,27 @@ public class DeviceService {
           cloud.serviceName()
               + " sync is not set up. Add the API credentials to the configuration.");
     }
-    if (!cloud.connected()) {
+    if (!cloud.connected(user)) {
       throw new DeviceException(
           HttpStatus.CONFLICT, "Connect your " + cloud.serviceName() + " account first.");
     }
-    StoredRoute route = routes.get(routeId);
+    StoredRoute route = routes.get(user, routeId);
     Optional<String> existing = links.findRemoteId(routeId, cloud.service());
     String remoteId;
     try {
-      remoteId = cloud.upload(route, existing);
+      remoteId = cloud.upload(user, route, existing);
     } catch (CloudRouteGoneException e) {
       // Deleted on the cloud side: forget the link and create the route again.
       links.delete(routeId, cloud.service());
-      remoteId = cloud.upload(route, Optional.empty());
+      remoteId = cloud.upload(user, route, Optional.empty());
     }
     Instant now = clock.instant();
     links.save(routeId, cloud.service(), remoteId, now);
     return new SyncResult(cloud.service(), remoteId, now);
   }
 
-  public void disconnect(String deviceId) {
-    cloud(deviceId).disconnect();
+  public void disconnect(CurrentUser user, String deviceId) {
+    cloud(deviceId).disconnect(user);
   }
 
   private CloudSync cloud(String deviceId) {
@@ -104,7 +105,7 @@ public class DeviceService {
             () -> new DeviceException(HttpStatus.NOT_FOUND, device.name() + " has no cloud sync."));
   }
 
-  private DeviceInfo info(DeviceIntegration device) {
+  private DeviceInfo info(CurrentUser user, DeviceIntegration device) {
     List<FormatInfo> formatInfos =
         device.exportFormats().stream().map(formats::get).map(DeviceService::formatInfo).toList();
     CloudInfo cloud =
@@ -112,7 +113,10 @@ public class DeviceService {
             .cloudSync()
             .map(c ->
                 new CloudInfo(
-                    c.serviceName(), c.enabled(), c.enabled() && c.connected(), c.connectPath()))
+                    c.serviceName(),
+                    c.enabled(),
+                    c.enabled() && c.connected(user),
+                    c.connectPath()))
             .orElse(null);
     return new DeviceInfo(
         device.id(),

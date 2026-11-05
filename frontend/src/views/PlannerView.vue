@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import AppNav from '@/components/AppNav.vue'
 import ElevationChart from '@/components/ElevationChart.vue'
 import ExportPanel from '@/components/ExportPanel.vue'
 import LibraryShortcut from '@/components/LibraryShortcut.vue'
@@ -21,7 +20,6 @@ const hint = computed(() => {
 <template>
   <div class="planner">
     <aside class="panel">
-      <AppNav />
       <PlaceSearch />
       <RouteStats />
       <ExportPanel />
@@ -53,10 +51,8 @@ const hint = computed(() => {
   background: var(--panel);
   border-right: 1px solid var(--line);
   overflow-y: auto;
-  padding: 20px 20px 40px;
-}
-.panel :deep(.app-nav) {
-  margin-bottom: 16px;
+  min-height: 0;
+  padding: 16px 20px 40px;
 }
 .credits {
   margin-top: 28px;

@@ -1,12 +1,13 @@
 package app.trailplan.devices;
 
 import app.trailplan.routes.StoredRoute;
+import app.trailplan.users.CurrentUser;
 import java.util.Optional;
 
 /**
  * Uploads routes to a device maker's cloud account, from where the device syncs them. Which remote
  * route belongs to which saved route is stored by the core ({@link CloudLinkRepository}), so a
- * cloud integration does not need its own database columns.
+ * cloud integration does not need its own database columns. Accounts are connected per rider.
  */
 public interface CloudSync {
 
@@ -19,13 +20,13 @@ public interface CloudSync {
   /** False when the integration is not configured (e.g. no API credentials). */
   boolean enabled();
 
-  /** Whether an account is connected. */
-  boolean connected();
+  /** Whether the rider has connected an account. */
+  boolean connected(CurrentUser user);
 
   /** Where the browser goes to connect an account (usually the start of an OAuth flow). */
   String connectPath();
 
-  void disconnect();
+  void disconnect(CurrentUser user);
 
   /**
    * Creates the route in the cloud account, or updates it if {@code remoteId} is present.
@@ -33,5 +34,5 @@ public interface CloudSync {
    * @return the remote route id
    * @throws CloudRouteGoneException if the remote route no longer exists
    */
-  String upload(StoredRoute route, Optional<String> remoteId);
+  String upload(CurrentUser user, StoredRoute route, Optional<String> remoteId);
 }

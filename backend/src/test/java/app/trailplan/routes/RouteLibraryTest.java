@@ -39,15 +39,18 @@ class RouteLibraryTest {
   @Autowired RouteRepository repository;
   @Autowired JdbcClient jdbc;
   TestHttp http;
+  long rider;
 
   @BeforeEach
-  void setUp() {
+  void setUp() throws Exception {
     http = new TestHttp(port);
     jdbc.sql("DELETE FROM route").update();
+    rider = http.chooseNewRider("Library");
   }
 
   private long plannedRoute(String name) {
     return repository.insert(
+        rider,
         new RouteDraft(
             name,
             List.of(new GeoPoint(49.61, 6.13), new GeoPoint(49.62, 6.14)),
@@ -110,6 +113,7 @@ class RouteLibraryTest {
   void importedRoutesAreListedAsNotEditableAndKeepTheirTrack() throws Exception {
     long id =
         repository.insertImported(
+            rider,
             new ImportedRoute("Komoot tour", RouteSource.KOMOOT, "komoot:42", TRACK, 1500, 20, 5),
             Instant.parse("2026-01-01T00:00:00Z"));
 
@@ -119,10 +123,10 @@ class RouteLibraryTest {
     assertThat(http.get("/api/routes/" + id).body())
         .contains("\"waypoints\":[]")
         .contains("\"track\":[[6.13,49.61,300.0],[6.14,49.62,320.0]]");
-    assertThat(repository.findActiveIdByExternalId("komoot:42")).contains(id);
+    assertThat(repository.findActiveIdByExternalId(rider, "komoot:42")).contains(id);
 
     http.send("DELETE", "/api/routes/" + id, null);
-    assertThat(repository.findActiveIdByExternalId("komoot:42")).isEmpty();
+    assertThat(repository.findActiveIdByExternalId(rider, "komoot:42")).isEmpty();
   }
 
   @Test

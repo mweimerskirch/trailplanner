@@ -26,6 +26,9 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   optional request fields must be boxed and get their default in the record constructor (see
   `RoutingPreferences`).
 - `frontend/src/types.ts` mirrors the Java records. Keep the two in sync.
+- Riders: there are no passwords. The chosen rider is a cookie, resolved into a `CurrentUser`
+  controller parameter (401 with reason `NO_USER` if missing). Every route query must be scoped
+  to the rider (`RouteRepository` methods take `userId`); cloud connections are per rider too.
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
   `MTB_SCALE_VALUES` in `BRouterProfileGenerator` when upgrading BRouter.
 

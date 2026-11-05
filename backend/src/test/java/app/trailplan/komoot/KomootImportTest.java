@@ -109,6 +109,7 @@ class KomootImportTest {
   @Test
   void signInListImportAndSignOut() throws Exception {
     TestHttp http = new TestHttp(port);
+    http.chooseNewRider("Komoot rider");
 
     assertThat(http.get("/api/komoot/tours").statusCode()).isEqualTo(401);
     assertThat(

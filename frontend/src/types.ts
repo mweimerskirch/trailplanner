@@ -133,3 +133,14 @@ export interface KomootTour {
   date: string | null
   imported: boolean
 }
+
+/** A rider (no password); each has their own library. */
+export interface Rider {
+  id: number
+  name: string
+}
+
+export interface RiderSummary extends Rider {
+  /** Routes in the library, not counting the trash. */
+  routes: number
+}

@@ -2,7 +2,6 @@
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
-import AppNav from '@/components/AppNav.vue'
 import ImportDialog from '@/components/ImportDialog.vue'
 import * as planner from '@/planner'
 import type { RouteSource, RouteSummary } from '@/types'
@@ -163,8 +162,6 @@ watch(planner.libraryVersion, load)
 <template>
   <div class="library-page">
     <div class="inner">
-      <AppNav />
-
       <div class="toolbar">
         <div class="tabs" role="tablist">
           <button
@@ -353,7 +350,7 @@ watch(planner.libraryVersion, load)
   align-items: flex-end;
   justify-content: space-between;
   gap: 12px;
-  margin: 24px 0 14px;
+  margin: 4px 0 14px;
   border-bottom: 1px solid var(--line);
 }
 .tabs {

@@ -74,7 +74,40 @@ public class DatabaseMigrations implements InitializingBean {
               FROM route WHERE wahoo_route_id IS NOT NULL
               """,
               "ALTER TABLE route DROP COLUMN wahoo_route_id",
-              "ALTER TABLE route DROP COLUMN wahoo_synced_at"));
+              "ALTER TABLE route DROP COLUMN wahoo_synced_at"),
+          // 4: riders. Each rider has their own routes and cloud connections. Existing data goes to
+          //    a first rider called "Rider" (renamable), created only if there is data to own.
+          List.of(
+              """
+              CREATE TABLE app_user (
+                id         INTEGER PRIMARY KEY AUTOINCREMENT,
+                name       TEXT    NOT NULL,
+                created_at TEXT    NOT NULL
+              )
+              """,
+              """
+              INSERT INTO app_user (name, created_at)
+              SELECT 'Rider', strftime('%Y-%m-%dT%H:%M:%SZ', 'now')
+              WHERE EXISTS (SELECT 1 FROM route) OR EXISTS (SELECT 1 FROM wahoo_token)
+              """,
+              "ALTER TABLE route ADD COLUMN user_id INTEGER REFERENCES app_user (id) ON DELETE CASCADE",
+              "UPDATE route SET user_id = (SELECT MIN(id) FROM app_user)",
+              "CREATE INDEX route_user ON route (user_id, deleted_at)",
+              """
+              CREATE TABLE wahoo_token_new (
+                user_id       INTEGER PRIMARY KEY REFERENCES app_user (id) ON DELETE CASCADE,
+                access_token  TEXT NOT NULL,
+                refresh_token TEXT NOT NULL,
+                expires_at    TEXT NOT NULL
+              )
+              """,
+              """
+              INSERT INTO wahoo_token_new (user_id, access_token, refresh_token, expires_at)
+              SELECT (SELECT MIN(id) FROM app_user), access_token, refresh_token, expires_at
+              FROM wahoo_token
+              """,
+              "DROP TABLE wahoo_token",
+              "ALTER TABLE wahoo_token_new RENAME TO wahoo_token"));
 
   private final JdbcClient jdbc;
   private final TransactionTemplate transactions;

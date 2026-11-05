@@ -4,6 +4,7 @@ import app.trailplan.devices.DeviceException;
 import app.trailplan.komoot.KomootException;
 import app.trailplan.routes.RouteNotFoundException;
 import app.trailplan.routing.RoutingException;
+import app.trailplan.users.NoUserSelectedException;
 import app.trailplan.wahoo.WahooException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -67,6 +68,16 @@ public class ApiExceptionHandler {
   ProblemDetail device(DeviceException e) {
     ProblemDetail problem = ProblemDetail.forStatusAndDetail(e.status(), e.getMessage());
     problem.setTitle("Sending failed");
+    return problem;
+  }
+
+  /** The UI reacts to reason NO_USER by showing the rider selection. */
+  @ExceptionHandler
+  ProblemDetail noUser(NoUserSelectedException e) {
+    ProblemDetail problem =
+        ProblemDetail.forStatusAndDetail(HttpStatus.UNAUTHORIZED, e.getMessage());
+    problem.setTitle("No rider chosen");
+    problem.setProperty("reason", "NO_USER");
     return problem;
   }
 }
