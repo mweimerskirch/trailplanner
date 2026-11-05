@@ -59,4 +59,18 @@ class BRouterProfileGeneratorTest {
     assertThat(generator.generate(RoutingPreferences.defaults()))
         .isEqualTo(generator.generate(new RoutingPreferences(null, null, null, false)));
   }
+
+  @Test
+  void forcedProfilesAllowClosedAndRestrictedWaysAtACost() {
+    String normal = generator.generate(RoutingPreferences.defaults());
+    String forced = generator.generate(RoutingPreferences.defaults(), true);
+
+    assertThat(normal)
+        .contains("switch or blocked badoneway 10000\n")
+        .doesNotContain("construction");
+    assertThat(forced)
+        .contains("switch highway=construction 8\n")
+        .contains("switch or blocked badoneway 8\n")
+        .contains("switch highway=motorway|motorway_link 10000\n");
+  }
 }

@@ -42,7 +42,8 @@ public final class BRouterResponseParser {
     JsonNode props = feature.path("properties");
     double distance = props.path("track-length").asDouble(0);
     double ascent = props.path("filtered ascend").asDouble(0);
-    return new RouteLeg(points, distance, ascent, breakdown(props.path("messages")));
+    JsonNode messages = props.path("messages");
+    return new RouteLeg(points, distance, ascent, breakdown(messages), warnings(messages));
   }
 
   /**
@@ -76,6 +77,38 @@ public final class BRouterResponseParser {
       surfaces.merge(Surface.classify(tags.get("surface")), metres, Double::sum);
     }
     return new LegBreakdown(ways, other, surfaces);
+  }
+
+  /**
+   * Restricted ways on the leg (only forced legs can use them), one warning per stretch with the
+   * same reason, placed where that stretch ends.
+   */
+  private static List<RouteWarning> warnings(JsonNode messages) {
+    List<RouteWarning> warnings = new ArrayList<>();
+    if (!messages.isArray() || messages.size() < 2) {
+      return warnings;
+    }
+    JsonNode header = messages.get(0);
+    int lngCol = column(header, "Longitude");
+    int latCol = column(header, "Latitude");
+    int tagsCol = column(header, "WayTags");
+    if (lngCol < 0 || latCol < 0 || tagsCol < 0) {
+      return warnings;
+    }
+    String previous = null;
+    for (int i = 1; i < messages.size(); i++) {
+      JsonNode row = messages.get(i);
+      String reason = RouteWarning.reasonFor(parseTags(row.path(tagsCol).asString("")));
+      if (reason != null && !reason.equals(previous)) {
+        warnings.add(
+            new RouteWarning(
+                row.path(lngCol).asDouble() / 1_000_000,
+                row.path(latCol).asDouble() / 1_000_000,
+                reason));
+      }
+      previous = reason;
+    }
+    return warnings;
   }
 
   private static int column(JsonNode header, String name) {

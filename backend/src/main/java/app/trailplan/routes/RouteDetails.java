@@ -1,8 +1,8 @@
 package app.trailplan.routes;
 
-import app.trailplan.routing.GeoPoint;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrackPoint;
+import app.trailplan.routing.Waypoint;
 import java.time.Instant;
 import java.util.List;
 
@@ -14,7 +14,7 @@ import java.util.List;
 public record RouteDetails(
     long id,
     String name,
-    List<GeoPoint> waypoints,
+    List<Waypoint> waypoints,
     RoutingPreferences preferences,
     List<TrackPoint> track,
     double distance,

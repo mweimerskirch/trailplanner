@@ -5,11 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import app.trailplan.TestHttp;
 import app.trailplan.routes.RouteDraft;
 import app.trailplan.routes.RouteRepository;
-import app.trailplan.routing.GeoPoint;
 import app.trailplan.routing.LegBreakdown;
 import app.trailplan.routing.PlannedRoute;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrackPoint;
+import app.trailplan.routing.Waypoint;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import java.io.IOException;
@@ -95,7 +95,7 @@ class DeviceApiTest {
         rider,
         new RouteDraft(
             "Tour",
-            List.of(new GeoPoint(49.61, 6.13), new GeoPoint(49.62, 6.14)),
+            List.of(Waypoint.of(49.61, 6.13), Waypoint.of(49.62, 6.14)),
             RoutingPreferences.defaults()),
         new PlannedRoute(
             List.of(new TrackPoint(6.13, 49.61, 300.0), new TrackPoint(6.14, 49.62, 320.0)),

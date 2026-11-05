@@ -16,7 +16,7 @@ import {
   VECTOR_STYLE_URL,
 } from '@/map/layers'
 import * as planner from '@/planner'
-import type { GeoPoint } from '@/types'
+import type { GeoPoint, LegType } from '@/types'
 
 // MapLibre 6 looks for its worker next to its own module (import.meta.url). Once Vite has bundled
 // it, that is /assets/maplibre-gl-worker.mjs, which does not exist, and no tiles load. Let Vite emit
@@ -64,7 +64,8 @@ function renderRoute() {
     return [
       {
         type: 'Feature' as const,
-        properties: { leg: i, state: state.status },
+        // kind: how the leg is calculated (ROUTED, FORCED, STRAIGHT); imported tracks count as routed.
+        properties: { leg: i, state: state.status, kind: pts[i]?.leg ?? 'ROUTED' },
         geometry: { type: 'LineString' as const, coordinates },
       },
     ]
@@ -126,21 +127,76 @@ function markerElement(index: number, count: number): HTMLElement {
   return el
 }
 
-function removePopup(index: number): maplibregl.Popup {
+const LEG_CHOICES: { type: LegType; label: string }[] = [
+  { type: 'ROUTED', label: 'Follow trails' },
+  { type: 'FORCED', label: 'Force through closed ways' },
+  { type: 'STRAIGHT', label: 'Straight line' },
+]
+
+/** Popup of a waypoint: how its next leg is calculated, and removing it. */
+function waypointPopup(index: number): maplibregl.Popup {
+  const pts = planner.waypoints.value
   const content = document.createElement('div')
+  content.className = 'wp-popup'
   const title = document.createElement('strong')
-  title.textContent = `Waypoint ${index + 1}`
+  title.textContent = `Waypoint ${String(index + 1)}`
+  content.append(title)
+  const popup = new maplibregl.Popup({ offset: 16, closeButton: true })
+  if (index < pts.length - 1) {
+    const label = document.createElement('label')
+    label.textContent = 'Next leg'
+    const select = document.createElement('select')
+    for (const choice of LEG_CHOICES) {
+      const option = document.createElement('option')
+      option.value = choice.type
+      option.textContent = choice.label
+      option.selected = (pts[index]?.leg ?? 'ROUTED') === choice.type
+      select.append(option)
+    }
+    select.addEventListener('change', () => {
+      popup.remove()
+      planner.setLegType(index, select.value as LegType)
+    })
+    label.append(select)
+    content.append(label)
+  }
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'popup-button'
   button.textContent = 'Remove point'
-  content.append(title, document.createElement('br'), button)
-  const popup = new maplibregl.Popup({ offset: 16, closeButton: true }).setDOMContent(content)
   button.addEventListener('click', () => {
     popup.remove()
     planner.removeWaypoint(index)
   })
-  return popup
+  content.append(button)
+  return popup.setDOMContent(content)
+}
+
+// ---------- warnings ----------
+
+let warningMarkers: maplibregl.Marker[] = []
+
+/** A marker at every closed or restricted way the route uses, explaining why. */
+function renderWarnings() {
+  const m = map
+  if (!m) return
+  for (const marker of warningMarkers) marker.remove()
+  warningMarkers = planner.warnings.value.map((w) => {
+    const el = document.createElement('button')
+    el.type = 'button'
+    el.className = 'route-warning'
+    el.textContent = '!'
+    el.setAttribute('aria-label', `Warning: ${w.reason}`)
+    const text = document.createElement('div')
+    text.className = 'warning-popup'
+    const strong = document.createElement('strong')
+    strong.textContent = w.reason
+    const note = document.createElement('p')
+    note.textContent = 'The route is forced through here. Check on site before you ride.'
+    text.append(strong, note)
+    const popup = new maplibregl.Popup({ offset: 14 }).setDOMContent(text)
+    return new maplibregl.Marker({ element: el }).setLngLat([w.lng, w.lat]).setPopup(popup).addTo(m)
+  })
 }
 
 function renderMarkers() {
@@ -184,7 +240,7 @@ function renderMarkers() {
     element.addEventListener('click', (event) => {
       event.stopPropagation()
       if (dragged || !map) return
-      removePopup(index).setLngLat([p.lng, p.lat]).addTo(map)
+      waypointPopup(index).setLngLat([p.lng, p.lat]).addTo(map)
     })
     element.addEventListener('contextmenu', (event) => {
       event.preventDefault()
@@ -362,6 +418,7 @@ onMounted(() => {
     setupInteraction(m)
     renderRoute()
     renderMarkers()
+    renderWarnings()
     fitIfRequested()
   })
   darkQuery.addEventListener('change', onColorSchemeChange)
@@ -383,7 +440,10 @@ watch(planner.waypoints, () => {
   if (ready) renderMarkers()
 })
 watch(planner.displayLegs, () => {
-  if (ready) renderRoute()
+  if (ready) {
+    renderRoute()
+    renderWarnings()
+  }
 })
 watch(planner.hoverIndex, () => {
   if (ready) renderHover()

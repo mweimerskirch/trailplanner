@@ -1,4 +1,4 @@
-import type { Map as MapLibreMap, RasterSourceSpecification } from 'maplibre-gl'
+import type { ExpressionSpecification, Map as MapLibreMap, RasterSourceSpecification } from 'maplibre-gl'
 
 /** Free vector base map (no API key). Raster maps below are drawn on top of it when chosen. */
 export const VECTOR_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty'
@@ -93,6 +93,14 @@ export function showMtbOverlay(map: MapLibreMap, visible: boolean) {
   map.setLayoutProperty('overlay-mtb', 'visibility', visible ? 'visible' : 'none')
 }
 
+/** Colour of forced legs (closed or restricted ways allowed). */
+export const FORCED_COLOR = '#E07B00'
+
+/** Route colour by leg kind: forced legs stand out. */
+function lineColor(routeColor: string): ExpressionSpecification {
+  return ['case', ['==', ['get', 'kind'], 'FORCED'], FORCED_COLOR, routeColor]
+}
+
 export function addRouteLayers(map: MapLibreMap, routeColor: string) {
   const empty = { type: 'FeatureCollection' as const, features: [] }
   map.addSource('route', { type: 'geojson', data: empty })
@@ -111,9 +119,18 @@ export function addRouteLayers(map: MapLibreMap, routeColor: string) {
     id: 'route-line',
     type: 'line',
     source: 'route',
-    filter: ['==', ['get', 'state'], 'ok'],
+    filter: ['all', ['==', ['get', 'state'], 'ok'], ['!=', ['get', 'kind'], 'STRAIGHT']],
     layout: { 'line-join': 'round', 'line-cap': 'round' },
-    paint: { 'line-color': routeColor, 'line-width': 5 },
+    paint: { 'line-color': lineColor(routeColor), 'line-width': 5 },
+  })
+  // Straight legs (no mapped way): dotted, so they read as "not a real path".
+  map.addLayer({
+    id: 'route-straight',
+    type: 'line',
+    source: 'route',
+    filter: ['all', ['==', ['get', 'state'], 'ok'], ['==', ['get', 'kind'], 'STRAIGHT']],
+    layout: { 'line-cap': 'round' },
+    paint: { 'line-color': routeColor, 'line-width': 5, 'line-dasharray': [0.1, 1.8] },
   })
   map.addLayer({
     id: 'route-pending',
@@ -154,7 +171,8 @@ export function addRouteLayers(map: MapLibreMap, routeColor: string) {
 }
 
 export function setRouteColor(map: MapLibreMap, color: string) {
-  map.setPaintProperty('route-line', 'line-color', color)
+  map.setPaintProperty('route-line', 'line-color', lineColor(color))
+  map.setPaintProperty('route-straight', 'line-color', color)
   map.setPaintProperty('drag-preview', 'line-color', color)
   map.setPaintProperty('hover', 'circle-color', color)
   map.setPaintProperty('route-pending', 'line-color', [

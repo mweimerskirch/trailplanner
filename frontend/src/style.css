@@ -232,3 +232,48 @@ code {
 .popup-button {
   margin-top: 6px;
 }
+
+/* Closed or restricted way on a forced leg (MapView warning markers). */
+.route-warning {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #ffffff;
+  border-radius: 50%;
+  background: #e07b00;
+  color: #ffffff;
+  font: 800 14px/1 var(--font-body);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 40%);
+  cursor: pointer;
+}
+
+.warning-popup {
+  max-width: 220px;
+  color: #1c2620;
+}
+
+.warning-popup p {
+  margin: 4px 0 0;
+  font-size: 13px;
+}
+
+.wp-popup {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 190px;
+  color: #1c2620;
+}
+
+.wp-popup label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 13px;
+}
+
+.wp-popup select {
+  padding: 4px 6px;
+  background: #ffffff;
+  color: #1c2620;
+}

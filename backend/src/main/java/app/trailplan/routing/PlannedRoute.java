@@ -22,8 +22,16 @@ public record PlannedRoute(
     LegBreakdown breakdown = LegBreakdown.empty();
     for (RouteLeg leg : legs) {
       List<TrackPoint> legPoints = leg.points();
-      // Each leg starts where the previous one ended; skip the duplicate junction point.
+      // Each leg starts where the previous one ended; skip the duplicate junction point, but keep
+      // its elevation if the previous leg has none there (straight legs have no elevation).
       int start = points.isEmpty() ? 0 : 1;
+      if (start == 1 && !legPoints.isEmpty()) {
+        TrackPoint last = points.get(points.size() - 1);
+        TrackPoint junction = legPoints.get(0);
+        if (last.ele() == null && junction.ele() != null) {
+          points.set(points.size() - 1, new TrackPoint(last.lng(), last.lat(), junction.ele()));
+        }
+      }
       points.addAll(legPoints.subList(Math.min(start, legPoints.size()), legPoints.size()));
       distance += leg.distance();
       ascent += leg.ascent();

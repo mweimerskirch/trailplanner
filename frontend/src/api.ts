@@ -1,5 +1,7 @@
 import type {
   CloudSyncResult,
+  ConversionResult,
+  LegType,
   DeviceInfo,
   GeoPoint,
   ImportResult,
@@ -77,12 +79,34 @@ async function json<T>(path: string, init?: RequestInit, signal?: AbortSignal): 
 }
 
 export const api = {
-  routeLeg(from: GeoPoint, to: GeoPoint, preferences: RoutingPreferences, signal?: AbortSignal) {
+  routeLeg(
+    from: GeoPoint,
+    to: GeoPoint,
+    preferences: RoutingPreferences,
+    type: LegType = 'ROUTED',
+    signal?: AbortSignal,
+  ) {
     return json<RouteLeg>(
       '/api/routing/leg',
-      { method: 'POST', body: JSON.stringify({ from, to, preferences }) },
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          from: { lat: from.lat, lng: from.lng },
+          to: { lat: to.lat, lng: to.lng },
+          preferences,
+          type,
+        }),
+      },
       signal,
     )
+  },
+
+  /** Waypoints for editing an imported route; nothing is saved. */
+  convertRoute(id: number, preferences: RoutingPreferences) {
+    return json<ConversionResult>(`/api/routes/${id}/conversion`, {
+      method: 'POST',
+      body: JSON.stringify({ preferences }),
+    })
   },
 
   listRoutes() {

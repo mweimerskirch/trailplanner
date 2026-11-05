@@ -30,7 +30,14 @@ public final class ProfileStore {
 
   /** Returns the BRouter profile id for these preferences, writing the profile if needed. */
   public String profileIdFor(RoutingPreferences preferences) {
-    String content = generator.generate(preferences);
+    return profileIdFor(preferences, false);
+  }
+
+  /**
+   * As {@link #profileIdFor(RoutingPreferences)}, optionally allowing closed and restricted ways.
+   */
+  public String profileIdFor(RoutingPreferences preferences, boolean forced) {
+    String content = generator.generate(preferences, forced);
     String name = "tp_" + sha256(content).substring(0, 16);
     Path target = directory.resolve(name + ".brf");
     if (!Files.exists(target)) {

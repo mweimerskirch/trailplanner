@@ -1,9 +1,9 @@
 package app.trailplan.routes;
 
-import app.trailplan.routing.GeoPoint;
 import app.trailplan.routing.PlannedRoute;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrackPoint;
+import app.trailplan.routing.Waypoint;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.Instant;
@@ -24,7 +24,7 @@ import tools.jackson.databind.ObjectMapper;
 @Repository
 public class RouteRepository {
 
-  private static final TypeReference<List<GeoPoint>> WAYPOINTS = new TypeReference<>() {};
+  private static final TypeReference<List<Waypoint>> WAYPOINTS = new TypeReference<>() {};
   private static final TypeReference<List<TrackPoint>> TRACK = new TypeReference<>() {};
   private static final TypeReference<RoutingPreferences> PREFERENCES = new TypeReference<>() {};
 

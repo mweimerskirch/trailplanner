@@ -1,8 +1,11 @@
 package app.trailplan.routes;
 
+import app.trailplan.routing.RoutingPreferences;
+import app.trailplan.routing.TrackConverter;
 import app.trailplan.users.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.net.URI;
 import java.util.List;
@@ -26,6 +29,8 @@ public class RouteController {
   public record RenameRequest(@NotBlank @Size(max = RouteService.MAX_NAME_LENGTH) String name) {}
 
   public record EmptyTrashResult(int deleted) {}
+
+  public record ConversionRequest(@NotNull RoutingPreferences preferences) {}
 
   private final RouteService routes;
 
@@ -72,6 +77,13 @@ public class RouteController {
   public RouteDetails rename(
       CurrentUser user, @PathVariable long id, @Valid @RequestBody RenameRequest request) {
     return routes.rename(user, id, request.name()).details();
+  }
+
+  /** Waypoints for editing an imported route; nothing is saved. */
+  @PostMapping("/routes/{id}/conversion")
+  public TrackConverter.Result convert(
+      CurrentUser user, @PathVariable long id, @Valid @RequestBody ConversionRequest request) {
+    return routes.convert(user, id, request.preferences());
   }
 
   @PostMapping("/routes/{id}/duplicate")

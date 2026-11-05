@@ -20,6 +20,24 @@ export interface GeoPoint {
   lng: number
 }
 
+/**
+ * How the leg from a waypoint to the next is calculated: ROUTED with the rider's preferences,
+ * FORCED allowing closed and restricted ways (with warnings), or a STRAIGHT line.
+ */
+export type LegType = 'ROUTED' | 'FORCED' | 'STRAIGHT'
+
+/** A waypoint; `leg` (default ROUTED) applies to the leg towards the next waypoint. */
+export interface Waypoint extends GeoPoint {
+  leg?: LegType
+}
+
+/** A closed or restricted way on a forced leg. */
+export interface RouteWarning {
+  lng: number
+  lat: number
+  reason: string
+}
+
 /** [lng, lat, elevation] – elevation is null where the elevation model has no data. */
 export type TrackPoint = [number, number, number | null]
 
@@ -34,11 +52,12 @@ export interface RouteLeg {
   distance: number
   ascent: number
   breakdown: LegBreakdown
+  warnings: RouteWarning[]
 }
 
 export interface RouteDraft {
   name: string
-  waypoints: GeoPoint[]
+  waypoints: Waypoint[]
   preferences: RoutingPreferences
 }
 
@@ -61,7 +80,7 @@ export interface RouteDetails {
   id: number
   name: string
   /** Empty for imported routes that are not editable yet. */
-  waypoints: GeoPoint[]
+  waypoints: Waypoint[]
   preferences: RoutingPreferences
   /** The stored track; for imported routes the original one. */
   track: TrackPoint[]
@@ -143,4 +162,11 @@ export interface Rider {
 export interface RiderSummary extends Rider {
   /** Routes in the library, not counting the trash. */
   routes: number
+}
+
+/** Waypoints for editing an imported route, checked against the router. */
+export interface ConversionResult {
+  waypoints: Waypoint[]
+  forcedLegs: number
+  straightLegs: number
 }

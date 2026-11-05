@@ -1,7 +1,6 @@
 import { computed, ref, shallowRef, toRaw, watch } from 'vue'
 import { api, ApiError } from './api'
 import { DEFAULT_PREFERENCES } from './constants'
-import { deriveWaypoints } from './convert'
 import type {
   GeoPoint,
   LegBreakdown,
@@ -10,9 +9,12 @@ import type {
   RouteLeg,
   RoutingPreferences,
   Surface,
+  RouteWarning,
   TrackPoint,
+  Waypoint,
   WayCategory,
 } from './types'
+import { inserted, legType, removed, reversed, withLegType } from './waypoints'
 
 /**
  * The planner's state, shared by all components. Waypoints are the source of truth; legs are
@@ -55,7 +57,7 @@ const MAX_PARALLEL_LEGS = 3
 const MAX_CACHED_LEGS = 500
 
 interface StoredState {
-  waypoints?: GeoPoint[]
+  waypoints?: Waypoint[]
   preferences?: Partial<RoutingPreferences>
   routeName?: string
   routeId?: number | null
@@ -88,7 +90,7 @@ function mergePreferences(stored: Partial<RoutingPreferences> | undefined): Rout
 /** Storage key of the active rider; null until a rider is chosen (nothing is saved before). */
 let storageKey: string | null = null
 
-export const waypoints = ref<GeoPoint[]>([])
+export const waypoints = ref<Waypoint[]>([])
 export const preferences = ref<RoutingPreferences>(mergePreferences(undefined))
 export const routeName = ref('MTB tour')
 /** Id of the saved route being edited, or null for a new, unsaved route. */
@@ -114,7 +116,7 @@ export const libraryVersion = ref(0)
  * would overwrite the opened route with the previous route's waypoints.
  */
 interface HistoryEntry {
-  waypoints: GeoPoint[]
+  waypoints: Waypoint[]
   route?: {
     id: number | null
     name: string
@@ -199,39 +201,44 @@ export function remember(includeRoute = false) {
   canUndo.value = true
 }
 
-function edit(change: (points: GeoPoint[]) => void, recordHistory = true) {
+/** Applies a change to the waypoint list (as a new list, so watchers see it). */
+function edit(change: (points: Waypoint[]) => Waypoint[], recordHistory = true) {
   if (fixedTrack.value) {
     setStatus('This route was imported. Press “Edit route” to change it.', 'info', 4000)
     return
   }
   if (recordHistory) remember()
-  const next = waypoints.value.map((p) => ({ ...p }))
-  change(next)
-  waypoints.value = next
+  waypoints.value = change(waypoints.value)
 }
 
 export const addWaypoint = (p: GeoPoint) => {
-  edit((pts) => pts.push(p))
+  edit((pts) => inserted(pts, pts.length, p))
 }
+/** Adds a via point into the leg before `index`; it keeps that leg's type (e.g. forced). */
 export const insertWaypoint = (index: number, p: GeoPoint) => {
-  edit((pts) => pts.splice(index, 0, p))
+  edit((pts) => inserted(pts, index, p))
 }
 export const removeWaypoint = (index: number) => {
-  edit((pts) => pts.splice(index, 1))
+  edit((pts) => removed(pts, index))
 }
 /** For marker drags: the history entry is recorded when the drag starts. */
 export const moveWaypoint = (index: number, p: GeoPoint) => {
-  edit((pts) => pts.splice(index, 1, p), false)
+  edit((pts) => pts.map((w, i) => (i === index ? { ...w, lat: p.lat, lng: p.lng } : w)), false)
+}
+/** Sets how the leg from waypoint `index` to the next one is calculated. */
+export const setLegType = (index: number, type: Waypoint['leg'] & string) => {
+  edit((pts) => withLegType(pts, index, type))
 }
 export const reverseRoute = () => {
-  if (waypoints.value.length > 1) edit((pts) => pts.reverse())
+  if (waypoints.value.length > 1) edit(reversed)
 }
 export const backToStart = () => {
   const first = waypoints.value[0]
-  if (first && waypoints.value.length > 1) edit((pts) => pts.push({ ...first }))
+  if (first && waypoints.value.length > 1)
+    edit((pts) => inserted(pts, pts.length, { lat: first.lat, lng: first.lng }))
 }
 export const clearRoute = () => {
-  if (waypoints.value.length > 0) edit((pts) => pts.splice(0))
+  if (waypoints.value.length > 0) edit(() => [])
 }
 
 export function undo() {
@@ -251,7 +258,7 @@ export function undo() {
 export function newRoute() {
   if (waypoints.value.length > 0 || routeId.value !== null || fixedTrack.value) remember(true)
   fixedTrack.value = null
-  edit((pts) => pts.splice(0), false)
+  edit(() => [], false)
   routeId.value = null
   routeName.value = 'MTB tour'
 }
@@ -268,23 +275,44 @@ export function openRoute(route: RouteDetails) {
   fitRequest.value++
 }
 
+/** True while the server converts an imported route into waypoints. */
+export const converting = ref(false)
+
 /**
- * Converts the open imported route into waypoints. The route is then recalculated with the
- * rider's preferences, so it may differ slightly from the original; saving makes it editable for
- * good. Undo goes back to the original track.
+ * Converts the open imported route into waypoints. The server places as few waypoints as possible
+ * and checks every leg against the router; where the original uses a way that is closed in the map
+ * data the leg is forced (with a warning), where no way exists it is a straight line. Undo goes
+ * back to the original track; saving keeps the converted route.
  */
-export function editImportedRoute() {
+export async function editImportedRoute() {
   const track = fixedTrack.value
-  if (!track) return
-  remember(true)
-  const points = deriveWaypoints(track.points)
-  fixedTrack.value = null
-  waypoints.value = points
-  setStatus(
-    `Converted to ${points.length} waypoints. The route now follows your preferences and may differ slightly from the original; save to keep it.`,
-    'info',
-    8000,
-  )
+  const id = routeId.value
+  if (!track || id === null || converting.value) return
+  converting.value = true
+  setStatus('Matching the original track with the router…')
+  try {
+    const result = await api.convertRoute(id, preferences.value)
+    remember(true)
+    fixedTrack.value = null
+    waypoints.value = result.waypoints
+    const notes = [
+      result.forcedLegs > 0
+        ? `${String(result.forcedLegs)} leg${result.forcedLegs === 1 ? ' uses' : 's use'} closed or restricted ways (orange, see the warnings)`
+        : '',
+      result.straightLegs > 0
+        ? `${String(result.straightLegs)} straight line${result.straightLegs === 1 ? '' : 's'} where no way exists (dotted)`
+        : '',
+    ].filter(Boolean)
+    setStatus(
+      `Converted to ${String(result.waypoints.length)} waypoints${notes.length ? `; ${notes.join(', ')}` : ''}. Save to keep it.`,
+      'info',
+      10000,
+    )
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Converting the route failed.', 'error')
+  } finally {
+    converting.value = false
+  }
 }
 
 export function draft(): RouteDraft {
@@ -303,6 +331,21 @@ let controller: AbortController | null = null
 
 const pointKey = (p: GeoPoint) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
 
+/** A straight leg needs no router; way type and elevation are unknown. */
+function straightLeg(from: GeoPoint, to: GeoPoint): RouteLeg {
+  const distance = haversine({ ...from, ele: null, distance: 0 }, { ...to, ele: null, distance: 0 })
+  return {
+    points: [
+      [from.lng, from.lat, null],
+      [to.lng, to.lat, null],
+    ],
+    distance,
+    ascent: 0,
+    breakdown: { wayTypes: {}, surfaces: { UNKNOWN: distance }, other: distance },
+    warnings: [],
+  }
+}
+
 async function recalculate() {
   const run = ++generation
   controller?.abort()
@@ -312,15 +355,24 @@ async function recalculate() {
   const pts = waypoints.value
   const prefs = preferences.value
   const prefsKey = JSON.stringify(prefs)
-  const keys = pts.slice(1).map((to, i) => `${prefsKey}|${pointKey(pts[i] ?? to)}|${pointKey(to)}`)
-  const next: LegState[] = keys.map((key) => {
+  const keys = pts
+    .slice(1)
+    .map((to, i) => `${prefsKey}|${legType(pts[i])}|${pointKey(pts[i] ?? to)}|${pointKey(to)}`)
+  const next: LegState[] = keys.map((key, i) => {
+    const from = pts[i]
+    const to = pts[i + 1]
+    if (from && to && legType(from) === 'STRAIGHT') return { status: 'ok', leg: straightLeg(from, to) }
     const cached = legCache.get(key)
     return cached ? { status: 'ok', leg: cached } : { status: 'loading' }
   })
   legs.value = next
 
   const todo = keys.flatMap((_key, i) => (next[i]?.status === 'loading' ? [i] : []))
-  if (todo.length === 0) return
+  if (todo.length === 0) {
+    // Nothing to calculate (e.g. undo to cached legs): drop a stale "Calculating…" or leg error.
+    if (status.value?.text === 'Calculating route…' || status.value?.kind === 'error') setStatus(null)
+    return
+  }
 
   setStatus('Calculating route…')
   const worker = async () => {
@@ -331,7 +383,7 @@ async function recalculate() {
       if (!from || !to || key === undefined) continue
       let state: LegState
       try {
-        const leg = await api.routeLeg(from, to, prefs, signal)
+        const leg = await api.routeLeg(from, to, prefs, legType(from), signal)
         legCache.set(key, leg)
         // Each leg holds its full track; drop the oldest entries so long sessions stay small.
         for (const oldest of legCache.keys()) {
@@ -378,12 +430,18 @@ export const displayLegs = computed<LegState[]>(() => {
     distance: track.distance,
     ascent: track.ascent,
     breakdown: { wayTypes: {}, surfaces: {}, other: 0 },
+    warnings: [],
   }
   return [{ status: 'ok', leg }]
 })
 
 export const routeComplete = computed(
   () => displayLegs.value.length > 0 && displayLegs.value.every((l) => l.status === 'ok'),
+)
+
+/** Closed or restricted ways the route uses (only forced legs can). */
+export const warnings = computed<RouteWarning[]>(() =>
+  displayLegs.value.flatMap((l) => (l.status === 'ok' ? l.leg.warnings : [])),
 )
 
 const okLegs = computed(() => displayLegs.value.flatMap((l) => (l.status === 'ok' ? [l.leg] : [])))
@@ -424,7 +482,12 @@ export const profile = computed<ProfilePoint[]>(() => {
   const result: ProfilePoint[] = []
   for (const leg of okLegs.value) {
     leg.points.forEach(([lng, lat, ele], index) => {
-      if (index === 0 && result.length > 0) return
+      if (index === 0 && result.length > 0) {
+        // Shared junction point: keep its elevation if the previous (straight) leg has none.
+        const last = result.at(-1)
+        if (last?.ele === null) last.ele = ele
+        return
+      }
       const point: ProfilePoint = { lng, lat, ele, distance: 0 }
       const previous = result.at(-1)
       point.distance = previous ? previous.distance + haversine(previous, point) : 0

@@ -51,4 +51,30 @@ class BRouterResponseParserTest {
     assertThatThrownBy(() -> parser.parse("{\"features\":[]}"))
         .isInstanceOf(RoutingException.class);
   }
+
+  @Test
+  void reportsClosedAndRestrictedWaysAsWarnings() {
+    String geoJson =
+        """
+        {"type":"FeatureCollection","features":[{"type":"Feature","properties":{
+          "track-length":"900","filtered ascend":"0",
+          "messages":[
+            ["Longitude","Latitude","Elevation","Distance","CostPerKm","ElevCost","TurnCost","NodeCost","InitialCost","WayTags","NodeTags","Time","Energy"],
+            ["6130000","49610000","300","300","1000","0","0","0","0","highway=track","","0","0"],
+            ["6131000","49611000","300","200","8000","0","0","0","0","highway=construction construction=secondary","","0","0"],
+            ["6132000","49612000","300","100","8000","0","0","0","0","highway=construction construction=secondary surface=asphalt","","0","0"],
+            ["6133000","49613000","300","100","8000","0","0","0","0","highway=path access=private bicycle=yes","","0","0"],
+            ["6134000","49614000","300","200","8000","0","0","0","0","highway=service access=private","","0","0"]
+          ]},
+          "geometry":{"type":"LineString","coordinates":[[6.13,49.61],[6.134,49.614]]}}]}
+        """;
+
+    RouteLeg leg = parser.parse(geoJson);
+
+    // One warning per stretch: the two construction rows are one stretch; bicycle=yes overrides.
+    assertThat(leg.warnings())
+        .containsExactly(
+            new RouteWarning(6.131, 49.611, "Under construction (closed in OpenStreetMap)"),
+            new RouteWarning(6.134, 49.614, "Private way"));
+  }
 }

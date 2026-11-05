@@ -1,7 +1,9 @@
 package app.trailplan.routes;
 
 import app.trailplan.routing.PlannedRoute;
+import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.RoutingService;
+import app.trailplan.routing.TrackConverter;
 import app.trailplan.users.CurrentUser;
 import java.time.Clock;
 import java.util.List;
@@ -11,6 +13,10 @@ import org.springframework.stereotype.Service;
 public class RouteService {
 
   static final int MAX_NAME_LENGTH = 120;
+
+  /** RouteDraft accepts 250 waypoints; leave room for the rider's own edits. */
+  static final int MAX_CONVERTED_WAYPOINTS = 200;
+
   private static final String COPY_SUFFIX = " (copy)";
 
   private final RouteRepository repository;
@@ -91,6 +97,19 @@ public class RouteService {
 
   public int emptyTrash(CurrentUser user) {
     return repository.emptyTrash(user.id());
+  }
+
+  /**
+   * Waypoints for editing an imported route: as few as possible, checked against the router so the
+   * route follows the original. Nothing is saved; the planner shows the result until the rider
+   * saves it.
+   */
+  public TrackConverter.Result convert(CurrentUser user, long id, RoutingPreferences preferences) {
+    StoredRoute route = get(user, id);
+    if (route.editable()) {
+      throw new IllegalArgumentException("This route already has waypoints.");
+    }
+    return routing.convertTrack(route.track(), preferences, MAX_CONVERTED_WAYPOINTS);
   }
 
   /** Recalculates the track server-side so stored tracks always match waypoints and profile. */

@@ -3,11 +3,11 @@ package app.trailplan.routes;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import app.trailplan.TestHttp;
-import app.trailplan.routing.GeoPoint;
 import app.trailplan.routing.LegBreakdown;
 import app.trailplan.routing.PlannedRoute;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrackPoint;
+import app.trailplan.routing.Waypoint;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -53,7 +53,7 @@ class RouteLibraryTest {
         rider,
         new RouteDraft(
             name,
-            List.of(new GeoPoint(49.61, 6.13), new GeoPoint(49.62, 6.14)),
+            List.of(Waypoint.of(49.61, 6.13), Waypoint.of(49.62, 6.14)),
             RoutingPreferences.defaults()),
         new PlannedRoute(TRACK, 1500, 20, 0, LegBreakdown.empty()),
         Instant.parse("2026-01-01T00:00:00Z"));

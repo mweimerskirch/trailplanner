@@ -12,8 +12,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/routing")
 public class RoutingController {
 
+  /** {@code type} defaults to a normally routed leg. */
   public record LegRequest(
-      @NotNull GeoPoint from, @NotNull GeoPoint to, @NotNull RoutingPreferences preferences) {}
+      @NotNull GeoPoint from,
+      @NotNull GeoPoint to,
+      @NotNull RoutingPreferences preferences,
+      LegType type) {}
 
   private final RoutingService routing;
 
@@ -23,7 +27,8 @@ public class RoutingController {
 
   @PostMapping("/leg")
   public RouteLeg leg(@Valid @RequestBody LegRequest request) {
-    return routing.leg(request.from(), request.to(), request.preferences());
+    LegType type = request.type() == null ? LegType.ROUTED : request.type();
+    return routing.leg(request.from(), request.to(), request.preferences(), type);
   }
 
   @GetMapping("/preferences/defaults")

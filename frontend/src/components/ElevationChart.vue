@@ -65,8 +65,11 @@ function draw() {
   ctx.fillText(label, width - PAD.right - ctx.measureText(label).width, height - 5)
 
   ctx.beginPath()
+  // Straight legs have no elevation: carry the last known height across them.
+  let known = points.find((p) => p.ele !== null)?.ele ?? lo
   points.forEach((p, i) => {
-    const py = y(p.ele ?? lo)
+    if (p.ele !== null) known = p.ele
+    const py = y(known)
     if (i === 0) ctx.moveTo(x(p.distance), py)
     else ctx.lineTo(x(p.distance), py)
   })
