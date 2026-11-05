@@ -123,9 +123,20 @@ function selectAll() {
   selected.value = all ? new Set() : new Set(selectable.value.map((t) => t.id))
 }
 
+/** Tours per request: large selections are imported in batches, with progress. */
+const BATCH = 20
+const progress = ref('')
+
 const importTours = () =>
   run(async () => {
-    finish(await api.komootImport([...selected.value]))
+    const ids = [...selected.value]
+    const all: ImportResult[] = []
+    for (let i = 0; i < ids.length; i += BATCH) {
+      progress.value = `Importing ${String(Math.min(i + BATCH, ids.length))} of ${String(ids.length)}…`
+      all.push(...(await api.komootImport(ids.slice(i, i + BATCH))))
+    }
+    progress.value = ''
+    finish(all)
     tours.value = await api.komootTours()
     selected.value = new Set()
   })
@@ -258,6 +269,7 @@ defineExpose({ open })
       </div>
 
       <p v-if="busy && tab === 'files'" class="empty">Importing…</p>
+      <p v-if="progress" class="empty" aria-live="polite">{{ progress }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div v-if="results.length" class="results" aria-live="polite">
         <p>

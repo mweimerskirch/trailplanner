@@ -1,8 +1,10 @@
 package app.trailplan.export;
 
+import app.trailplan.web.ApiException;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 
 /** All registered {@link RouteFormat}s by id. */
@@ -22,7 +24,8 @@ public class RouteFormats {
   public RouteFormat get(String id) {
     RouteFormat format = byId.get(id);
     if (format == null) {
-      throw new IllegalArgumentException("Unknown export format: " + id);
+      throw new ApiException(
+          HttpStatus.BAD_REQUEST, "Unknown format", "Unknown export format: " + id);
     }
     return format;
   }

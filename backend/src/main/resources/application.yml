@@ -21,6 +21,9 @@ spring:
     default-property-inclusion: always
 
 trailplan:
+  # Host names under which the API may be used, besides IP addresses, localhost and the public
+  # URL's host (protection against DNS rebinding). Comma-separated, e.g. "trailplan.home".
+  allowed-hosts: ${TRAILPLAN_ALLOWED_HOSTS:}
   router:
     base-url: ${BROUTER_URL:http://localhost:17777}
     custom-profile-dir: ${BROUTER_CUSTOM_PROFILE_DIR:../data/customprofiles}

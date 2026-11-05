@@ -12,9 +12,16 @@ public final class TestHttp {
   private final HttpClient http =
       HttpClient.newBuilder().cookieHandler(new java.net.CookieManager()).build();
   private final int port;
+  private String rider;
 
   public TestHttp(int port) {
     this.port = port;
+  }
+
+  /** Sends X-Trailplan-Rider with every request, as a page showing this rider would. */
+  public TestHttp asRider(long riderId) {
+    this.rider = Long.toString(riderId);
+    return this;
   }
 
   public HttpResponse<String> get(String path) throws Exception {
@@ -23,7 +30,11 @@ public final class TestHttp {
 
   public HttpResponse<String> send(String method, String path, String jsonBody) throws Exception {
     HttpRequest.Builder request =
-        HttpRequest.newBuilder(URI.create("http://localhost:" + port + path));
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            .header("X-Trailplan-Client", "web"); // as the app sends it (see ApiRequestGuard)
+    if (rider != null) {
+      request.header("X-Trailplan-Rider", rider);
+    }
     if (jsonBody == null) {
       request.method(method, HttpRequest.BodyPublishers.noBody());
     } else {

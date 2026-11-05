@@ -59,6 +59,8 @@ export interface RouteDraft {
   name: string
   waypoints: Waypoint[]
   preferences: RoutingPreferences
+  /** When saving changes: the route's updatedAt as last seen; refused if saved elsewhere since. */
+  expectedUpdatedAt?: string | null
 }
 
 export type RouteSource = 'PLANNER' | 'GPX' | 'FIT' | 'KOMOOT'
@@ -93,6 +95,8 @@ export interface RouteDetails {
   updatedAt: string
   source: RouteSource
   editable: boolean
+  /** Imported routes: the original track is kept and can be restored or downloaded. */
+  hasOriginal: boolean
   deletedAt: string | null
   archivedAt: string | null
 }

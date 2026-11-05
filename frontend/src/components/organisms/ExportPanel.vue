@@ -24,15 +24,6 @@ watch(currentRider, () => {
   void loadDevices()
 })
 
-function fileName(format: FormatInfo) {
-  const slug = planner.routeName.value
-    .normalize('NFD')
-    .replace(/\p{M}/gu, '')
-    .replace(/[^A-Za-z0-9-]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-  return `${slug || 'route'}.${format.extension}`
-}
-
 async function run(task: () => Promise<void>) {
   busy.value = true
   try {
@@ -45,8 +36,9 @@ async function run(task: () => Promise<void>) {
 }
 
 /**
- * Creates or updates the route; recreates it if the saved copy was deleted meanwhile. Imported
- * routes in view mode have no waypoints to save, so only their name is updated.
+ * Creates or updates the route. A save that would overwrite a newer version (saved elsewhere) or a
+ * route in the trash is refused by the server with a message; nothing is recreated behind the
+ * rider's back. Imported routes in view mode have no waypoints to save, so only their name is.
  */
 async function saveDraft(asNew = false): Promise<RouteDetails> {
   const id = planner.routeId.value
@@ -58,15 +50,9 @@ async function saveDraft(asNew = false): Promise<RouteDetails> {
   } else if (id === null || asNew) {
     saved = await api.createRoute(planner.draft())
   } else {
-    try {
-      saved = await api.updateRoute(id, planner.draft())
-    } catch (error) {
-      if (!(error instanceof ApiError && error.status === 404)) throw error
-      saved = await api.createRoute(planner.draft())
-    }
+    saved = await api.updateRoute(id, { ...planner.draft(), expectedUpdatedAt: planner.routeUpdatedAt.value })
   }
-  planner.routeId.value = saved.id
-  planner.routeName.value = saved.name
+  planner.savedAs(saved)
   planner.libraryVersion.value++
   return saved
 }
@@ -77,19 +63,17 @@ const save = (asNew: boolean) =>
     planner.setStatus(`Saved “${saved.name}”.`, 'info', 2500)
   })
 
-/** Imported routes are exported with their original track, planned ones are recalculated. */
-async function file(format: FormatInfo): Promise<File> {
+/** Imported routes in view mode are exported as stored; planned ones are recalculated. */
+async function file(format: FormatInfo, original = false): Promise<File> {
   const id = planner.routeId.value
-  const blob =
-    planner.viewOnly.value && id !== null
-      ? await api.exportSaved(id, format.id)
-      : await api.exportDraft(format.id, planner.draft())
-  return new File([blob], fileName(format), { type: blob.type })
+  return (planner.viewOnly.value || original) && id !== null
+    ? await api.exportSaved(id, format.id, original)
+    : await api.exportDraft(format.id, planner.draft())
 }
 
-const download = (format: FormatInfo) =>
+const download = (format: FormatInfo, original = false) =>
   run(async () => {
-    const f = await file(format)
+    const f = await file(format, original)
     const url = URL.createObjectURL(f)
     const link = document.createElement('a')
     link.href = url
@@ -196,6 +180,15 @@ onMounted(async () => {
           @click="download(format)"
         >
           Download {{ format.label }}
+        </button>
+        <button
+          v-if="planner.hasOriginal.value && !planner.viewOnly.value && device.formats[0]"
+          type="button"
+          :disabled="busy || planner.routeId.value === null"
+          title="The track as imported, before your edits"
+          @click="download(device.formats[0], true)"
+        >
+          Download original
         </button>
         <button
           v-if="canShareFiles && device.formats[0]"

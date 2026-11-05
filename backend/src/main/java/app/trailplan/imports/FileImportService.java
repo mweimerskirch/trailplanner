@@ -39,16 +39,10 @@ public class FileImportService {
     String safeName = fileName == null || fileName.isBlank() ? "route" : fileName;
     try {
       String externalId = "file:" + sha256(data);
-      Optional<Long> existing = routes.findActiveIdByExternalId(user.id(), externalId);
+      Optional<ImportResult> existing =
+          ExistingImports.check(routes, user.id(), externalId, safeName, "file");
       if (existing.isPresent()) {
-        String name =
-            routes.findById(user.id(), existing.get()).map(r -> r.name()).orElse(safeName);
-        return new ImportResult(
-            safeName,
-            ImportResult.Status.ALREADY_IMPORTED,
-            existing.get(),
-            name,
-            "This file is already in the library.");
+        return existing.get();
       }
 
       boolean isFit = FitReader.looksLikeFit(data);

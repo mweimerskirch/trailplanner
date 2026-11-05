@@ -111,4 +111,17 @@ class RidersTest {
     assertThat(http.get("/api/session").body()).isEqualTo("{\"user\":null}");
     assertThat(http.send("PUT", "/api/session", "{\"userId\":999999}").statusCode()).isEqualTo(404);
   }
+
+  @Test
+  void aTabStillShowingAnotherRiderIsStopped() throws Exception {
+    TestHttp browser = new TestHttp(port);
+    long first = browser.chooseNewRider("First");
+    // Another tab of the same browser switches to a second rider (shared cookie)...
+    browser.chooseNewRider("Second");
+
+    // ...while this tab still shows the first one and says so in every request.
+    var stale = browser.asRider(first).get("/api/routes");
+    assertThat(stale.statusCode()).isEqualTo(409);
+    assertThat(stale.body()).contains("\"reason\":\"RIDER_CHANGED\"").contains("Second");
+  }
 }

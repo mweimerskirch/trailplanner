@@ -73,6 +73,14 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
         <button type="button" @click="planner.backToStart">Back to start</button>
       </template>
       <button type="button" @click="planner.newRoute">New</button>
+      <button
+        v-if="planner.hasOriginal.value && !planner.viewOnly.value && planner.routeId.value !== null"
+        type="button"
+        title="Put the track back as it was imported"
+        @click="void planner.revertToOriginal()"
+      >
+        Back to original
+      </button>
     </div>
   </section>
 </template>

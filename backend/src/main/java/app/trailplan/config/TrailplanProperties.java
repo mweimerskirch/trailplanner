@@ -3,11 +3,20 @@ package app.trailplan.config;
 import java.net.URI;
 import java.nio.file.Path;
 import java.time.Duration;
+import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.boot.context.properties.bind.DefaultValue;
 
 @ConfigurationProperties("trailplan")
-public record TrailplanProperties(Router router, Wahoo wahoo, @DefaultValue Komoot komoot) {
+/**
+ * @param allowedHosts host names (besides IP addresses, localhost and the public URL's host) under
+ *     which the API may be used; see {@link app.trailplan.web.ApiRequestGuard}
+ */
+public record TrailplanProperties(
+    Router router,
+    Wahoo wahoo,
+    @DefaultValue Komoot komoot,
+    @DefaultValue List<String> allowedHosts) {
 
   /**
    * @param baseUrl BRouter server, e.g. http://brouter:17777

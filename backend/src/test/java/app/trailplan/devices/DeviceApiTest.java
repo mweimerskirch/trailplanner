@@ -111,7 +111,7 @@ class DeviceApiTest {
     TestHttp http = new TestHttp(port);
     long rider = http.chooseNewRider("Wahoo rider");
     jdbc.sql(
-            "INSERT OR REPLACE INTO wahoo_token VALUES (:user, 'access', 'refresh', '2099-01-01T00:00:00Z')")
+            "INSERT INTO cloud_account VALUES (:user, 'wahoo', 'access', 'refresh', '2099-01-01T00:00:00.000Z')")
         .param("user", rider)
         .update();
 
@@ -151,8 +151,13 @@ class DeviceApiTest {
 
     assertThat(http.send("POST", "/api/devices/generic/cloud/routes/" + copy, null).statusCode())
         .isEqualTo(404);
+    long linked = route(rider);
+    http.send("POST", "/api/devices/wahoo-elemnt/cloud/routes/" + linked, null);
+    assertThat(links.findRemoteId(linked, "wahoo")).isPresent();
     assertThat(http.send("DELETE", "/api/devices/wahoo-elemnt/cloud/connection", null).statusCode())
         .isEqualTo(204);
+    // A Wahoo account connected later must not receive updates meant for the old one.
+    assertThat(links.findRemoteId(linked, "wahoo")).isEmpty();
     assertThat(http.get("/api/devices").body()).contains("\"connected\":false");
     var notConnected = http.send("POST", "/api/devices/wahoo-elemnt/cloud/routes/" + copy, null);
     assertThat(notConnected.statusCode()).isEqualTo(409);

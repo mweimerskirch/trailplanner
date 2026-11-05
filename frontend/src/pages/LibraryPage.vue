@@ -123,11 +123,11 @@ const duplicate = (route: RouteSummary) =>
 
 const download = (route: RouteSummary) =>
   act(async () => {
-    const blob = await api.exportSaved(route.id, 'gpx')
-    const url = URL.createObjectURL(blob)
+    const file = await api.exportSaved(route.id, 'gpx')
+    const url = URL.createObjectURL(file)
     const link = document.createElement('a')
     link.href = url
-    link.download = `${route.name.replace(/[^\p{L}\p{N} _-]+/gu, '_') || 'route'}.gpx`
+    link.download = file.name // the server's name for it (Content-Disposition)
     document.body.append(link)
     link.click()
     link.remove()
@@ -153,7 +153,16 @@ const unarchive = (route: RouteSummary) =>
 const moveToTrash = (route: RouteSummary) =>
   act(async () => {
     await api.deleteRoute(route.id)
-    if (planner.routeId.value === route.id) planner.routeId.value = null
+    if (planner.routeId.value === route.id) {
+      // The open route went to the trash: an imported (view-only) one is closed; an edited one
+      // stays in the planner as a new, unsaved route the rider can still keep.
+      if (planner.viewOnly.value) planner.newRoute()
+      else {
+        planner.routeId.value = null
+        planner.routeUpdatedAt.value = null
+        planner.hasOriginal.value = false
+      }
+    }
     planner.setStatus(`Moved “${route.name}” to the trash.`, 'info', 3000)
     planner.libraryVersion.value++
   }, 'Could not delete the route.')

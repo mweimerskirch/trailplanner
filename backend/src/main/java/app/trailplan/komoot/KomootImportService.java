@@ -1,5 +1,6 @@
 package app.trailplan.komoot;
 
+import app.trailplan.imports.ExistingImports;
 import app.trailplan.imports.ImportResult;
 import app.trailplan.routes.ImportedRoute;
 import app.trailplan.routes.RouteRepository;
@@ -66,15 +67,9 @@ public class KomootImportService {
   private ImportResult importTour(CurrentUser user, KomootClient.Session session, long tourId) {
     String source = Long.toString(tourId);
     String externalId = EXTERNAL_ID_PREFIX + tourId;
-    var existing = routes.findActiveIdByExternalId(user.id(), externalId);
+    var existing = ExistingImports.check(routes, user.id(), externalId, source, "tour");
     if (existing.isPresent()) {
-      String name = routes.findById(user.id(), existing.get()).map(r -> r.name()).orElse(source);
-      return new ImportResult(
-          source,
-          ImportResult.Status.ALREADY_IMPORTED,
-          existing.get(),
-          name,
-          "This tour is already in the library.");
+      return existing.get();
     }
     try {
       KomootClient.TourTrack track = komoot.track(session, tourId);

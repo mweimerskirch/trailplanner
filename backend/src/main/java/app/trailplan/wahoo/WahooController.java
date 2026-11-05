@@ -39,6 +39,10 @@ public class WahooController {
   /** Starts the OAuth flow; the browser navigates here directly. */
   @GetMapping("/api/wahoo/connect")
   public ResponseEntity<Void> connect(CurrentUser user, HttpSession session) {
+    if (!wahoo.enabled()) {
+      // A browser navigation: answer with the planner and a message, not a JSON error page.
+      return redirect(publicUrl.resolve("/?wahoo=disabled"));
+    }
     byte[] bytes = new byte[24];
     random.nextBytes(bytes);
     String state = HexFormat.of().formatHex(bytes);

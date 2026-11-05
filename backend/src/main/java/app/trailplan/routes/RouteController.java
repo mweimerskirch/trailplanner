@@ -102,6 +102,12 @@ public class RouteController {
     return routes.convert(user, id, request.preferences());
   }
 
+  /** Puts an imported route's original track back (it becomes view-only again). */
+  @PostMapping("/routes/{id}/revert")
+  public RouteDetails revert(CurrentUser user, @PathVariable long id) {
+    return routes.revertToOriginal(user, id).details();
+  }
+
   @PostMapping("/routes/{id}/duplicate")
   public ResponseEntity<RouteDetails> duplicate(CurrentUser user, @PathVariable long id) {
     RouteDetails copy = routes.duplicate(user, id).details();

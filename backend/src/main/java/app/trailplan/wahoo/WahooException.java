@@ -1,24 +1,18 @@
 package app.trailplan.wahoo;
 
+import app.trailplan.web.ApiException;
 import org.springframework.http.HttpStatus;
 
-public class WahooException extends RuntimeException {
+/** A Wahoo request failed. The message is safe to show to the rider. */
+public class WahooException extends ApiException {
 
   private static final long serialVersionUID = 1L;
 
-  private final HttpStatus status;
-
   public WahooException(HttpStatus status, String message) {
-    super(message);
-    this.status = status;
+    super(status, "Wahoo sync failed", null, message, null);
   }
 
   public WahooException(HttpStatus status, String message, Throwable cause) {
-    super(message, cause);
-    this.status = status;
-  }
-
-  public HttpStatus status() {
-    return status;
+    super(status, "Wahoo sync failed", null, message, cause);
   }
 }

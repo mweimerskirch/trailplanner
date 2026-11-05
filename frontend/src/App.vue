@@ -10,6 +10,7 @@ onMounted(() => {
   const wahoo = params.get('wahoo')
   if (wahoo === 'connected') setStatus('Wahoo connected.', 'info', 3000)
   if (wahoo === 'failed') setStatus('Connecting to Wahoo failed. Please try again.', 'error')
+  if (wahoo === 'disabled') setStatus('Wahoo sync is not set up on this server.', 'error')
   if (wahoo) history.replaceState(null, '', window.location.pathname)
 })
 </script>

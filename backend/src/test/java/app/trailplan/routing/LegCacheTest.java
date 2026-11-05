@@ -50,4 +50,19 @@ class LegCacheTest {
     loads.incrementAndGet();
     return LEG;
   }
+
+  @Test
+  void entriesExpireSoUpdatedMapDataIsUsed() {
+    long[] now = {0};
+    LegCache cache = new LegCache(10, java.time.Duration.ofHours(6), () -> now[0]);
+    AtomicInteger loads = new AtomicInteger();
+
+    cache.get("a", () -> count(loads));
+    now[0] += java.time.Duration.ofHours(5).toNanos();
+    cache.get("a", () -> count(loads));
+    now[0] += java.time.Duration.ofHours(2).toNanos();
+    cache.get("a", () -> count(loads));
+
+    assertThat(loads).hasValue(2);
+  }
 }

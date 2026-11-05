@@ -11,7 +11,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
@@ -39,6 +41,7 @@ public class WahooClient {
   private final WahooTokenRepository tokens;
   private final FitCourseWriter fit;
   private final Clock clock;
+  private final Map<Long, Object> refreshLocks = new ConcurrentHashMap<>();
 
   public WahooClient(
       TrailplanProperties props,
@@ -132,7 +135,8 @@ public class WahooClient {
       throw new WahooException(
           HttpStatus.CONFLICT, "Wahoo rejected the login. Disconnect and connect Wahoo again.", e);
     } catch (RestClientException e) {
-      throw new WahooException(HttpStatus.BAD_GATEWAY, "Wahoo upload failed: " + e.getMessage(), e);
+      throw new WahooException(
+          HttpStatus.BAD_GATEWAY, "Wahoo did not accept the route. Try again later.", e);
     }
   }
 
@@ -155,7 +159,18 @@ public class WahooClient {
     return form;
   }
 
+  /**
+   * A usable access token, refreshed if it is about to expire. Wahoo invalidates a refresh token
+   * when it is used, so two parallel refreshes would break the connection: refreshing happens under
+   * a per-rider lock, and the token is read again inside it.
+   */
   private String validAccessToken(long userId) {
+    synchronized (refreshLocks.computeIfAbsent(userId, id -> new Object())) {
+      return validAccessTokenLocked(userId);
+    }
+  }
+
+  private String validAccessTokenLocked(long userId) {
     WahooToken token =
         tokens
             .find(userId)

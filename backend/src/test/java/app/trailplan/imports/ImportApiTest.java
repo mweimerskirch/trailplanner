@@ -54,6 +54,18 @@ class ImportApiTest {
     HttpResponse<String> again = upload(new String[] {"tour-copy.gpx", GPX});
     assertThat(again.body()).contains("\"status\":\"ALREADY_IMPORTED\"");
 
+    // Re-importing a file whose route is in the trash restores it instead.
+    long id = Long.parseLong(again.body().replaceAll(".*\"routeId\":(\\d+).*", "$1"));
+    client.send(
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/routes/" + id))
+            .header("X-Trailplan-Client", "web")
+            .DELETE()
+            .build(),
+        HttpResponse.BodyHandlers.ofString());
+    assertThat(get("/api/routes")).doesNotContain("Uploaded tour");
+    assertThat(upload(new String[] {"tour.gpx", GPX}).body())
+        .contains("was in the trash and is restored");
+
     String library = get("/api/routes");
     assertThat(library).contains("\"source\":\"GPX\"").contains("\"editable\":false");
     assertThat(library.split("Uploaded tour", -1)).hasSize(2); // exactly one copy
@@ -84,6 +96,7 @@ class ImportApiTest {
     body.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
     return client.send(
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/import/files"))
+            .header("X-Trailplan-Client", "web")
             .header("Content-Type", "multipart/form-data; boundary=" + boundary)
             .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()))
             .build(),
@@ -96,6 +109,7 @@ class ImportApiTest {
         client
             .send(
                 HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/users"))
+                    .header("X-Trailplan-Client", "web")
                     .header("Content-Type", "application/json")
                     .POST(HttpRequest.BodyPublishers.ofString("{\"name\":\"Importer\"}"))
                     .build(),
@@ -104,6 +118,7 @@ class ImportApiTest {
     String id = body.replaceAll(".*\"id\":(\\d+).*", "$1");
     client.send(
         HttpRequest.newBuilder(URI.create("http://localhost:" + port + "/api/session"))
+            .header("X-Trailplan-Client", "web")
             .header("Content-Type", "application/json")
             .PUT(HttpRequest.BodyPublishers.ofString("{\"userId\":" + id + "}"))
             .build(),

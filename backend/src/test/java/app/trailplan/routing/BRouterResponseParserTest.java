@@ -42,11 +42,12 @@ class BRouterResponseParserTest {
   void mapsRouterErrorsToRiderMessages() {
     assertThat(
             BRouterClient.fromRouterMessage("from-position not mapped in existing datafile", null)
-                .reason())
+                .routingReason())
         .isEqualTo(RoutingException.Reason.POINT_NOT_ON_MAP);
-    assertThat(BRouterClient.fromRouterMessage("datafile E10_N45.rd5 not found", null).reason())
+    assertThat(
+            BRouterClient.fromRouterMessage("datafile E10_N45.rd5 not found", null).routingReason())
         .isEqualTo(RoutingException.Reason.POINT_NOT_ON_MAP);
-    assertThat(BRouterClient.fromRouterMessage("target island detected", null).reason())
+    assertThat(BRouterClient.fromRouterMessage("target island detected", null).routingReason())
         .isEqualTo(RoutingException.Reason.NO_ROUTE);
     assertThatThrownBy(() -> parser.parse("{\"features\":[]}"))
         .isInstanceOf(RoutingException.class);

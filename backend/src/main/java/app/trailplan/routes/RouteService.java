@@ -6,6 +6,7 @@ import app.trailplan.routing.RoutingService;
 import app.trailplan.routing.TrackConverter;
 import app.trailplan.users.CurrentUser;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.List;
 import org.springframework.stereotype.Service;
 
@@ -62,19 +63,45 @@ public class RouteService {
 
   /** Saves new waypoints; for an imported route this is the conversion to an editable one. */
   public StoredRoute update(CurrentUser user, long id, RouteDraft draft) {
-    get(user, id); // 404 before spending time on routing
+    requireChangeable(user, id, draft.expectedUpdatedAt()); // before spending time on routing
     PlannedRoute planned = plan(draft);
-    if (!repository.update(user.id(), id, draft, planned, clock.instant())) {
+    if (!repository.update(
+        user.id(), id, draft, planned, clock.instant(), draft.expectedUpdatedAt())) {
+      requireChangeable(user, id, draft.expectedUpdatedAt()); // changed meanwhile: say why
       throw new RouteNotFoundException(id);
     }
     return get(user, id);
   }
 
   public StoredRoute rename(CurrentUser user, long id, String name) {
+    requireChangeable(user, id, null);
     if (!repository.rename(user.id(), id, name.strip(), clock.instant())) {
       throw new RouteNotFoundException(id);
     }
     return get(user, id);
+  }
+
+  /**
+   * Puts an imported route's original track back: the route is shown as imported again, without
+   * waypoints. Its edited version is replaced (undo in the planner or "Save as new" keep it).
+   */
+  public StoredRoute revertToOriginal(CurrentUser user, long id) {
+    StoredRoute route = requireChangeable(user, id, null);
+    OriginalTrack original = route.original().orElseThrow(RouteConflictException::noOriginal);
+    repository.revertToOriginal(user.id(), id, original, clock.instant());
+    return get(user, id);
+  }
+
+  /** The route, if it may be changed: it exists, is not in the trash, and is as expected. */
+  private StoredRoute requireChangeable(CurrentUser user, long id, Instant expectedUpdatedAt) {
+    StoredRoute route = get(user, id);
+    if (route.deletedAt().isPresent()) {
+      throw RouteConflictException.inTrash();
+    }
+    if (expectedUpdatedAt != null && !expectedUpdatedAt.equals(route.updatedAt())) {
+      throw RouteConflictException.changedElsewhere();
+    }
+    return route;
   }
 
   public StoredRoute duplicate(CurrentUser user, long id) {
@@ -119,7 +146,7 @@ public class RouteService {
   public TrackConverter.Result convert(CurrentUser user, long id, RoutingPreferences preferences) {
     StoredRoute route = get(user, id);
     if (route.editable()) {
-      throw new IllegalArgumentException("This route already has waypoints.");
+      throw RouteConflictException.alreadyEditable();
     }
     return routing.convertTrack(route.track(), preferences, MAX_CONVERTED_WAYPOINTS);
   }

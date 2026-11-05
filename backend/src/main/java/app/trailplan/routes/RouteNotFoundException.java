@@ -1,10 +1,13 @@
 package app.trailplan.routes;
 
-public class RouteNotFoundException extends RuntimeException {
+import app.trailplan.web.ApiException;
+import org.springframework.http.HttpStatus;
+
+public class RouteNotFoundException extends ApiException {
 
   private static final long serialVersionUID = 1L;
 
   public RouteNotFoundException(long id) {
-    super("Route " + id + " does not exist.");
+    super(HttpStatus.NOT_FOUND, "Route not found", "Route " + id + " does not exist.");
   }
 }

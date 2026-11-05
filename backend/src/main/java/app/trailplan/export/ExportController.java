@@ -1,5 +1,7 @@
 package app.trailplan.export;
 
+import app.trailplan.routes.OriginalTrack;
+import app.trailplan.routes.RouteConflictException;
 import app.trailplan.routes.RouteDraft;
 import app.trailplan.routes.RouteService;
 import app.trailplan.routes.StoredRoute;
@@ -14,6 +16,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /** Downloads in any registered {@link RouteFormat}. */
@@ -29,11 +32,22 @@ public class ExportController {
     this.formats = formats;
   }
 
-  /** A saved route, with its stored track (for imported routes: the original track). */
+  /**
+   * A saved route with its stored track; with {@code original=true}, an imported route's original
+   * track as imported, even after it was edited.
+   */
   @GetMapping("/routes/{id}/export/{format}")
   public ResponseEntity<byte[]> saved(
-      CurrentUser user, @PathVariable long id, @PathVariable String format) {
+      CurrentUser user,
+      @PathVariable long id,
+      @PathVariable String format,
+      @RequestParam(defaultValue = "false") boolean original) {
     StoredRoute route = routes.get(user, id);
+    if (original) {
+      OriginalTrack o = route.original().orElseThrow(RouteConflictException::noOriginal);
+      return file(
+          formats.get(format), new ExportedRoute(route.name(), o.track(), o.ascent(), o.descent()));
+    }
     return file(
         formats.get(format),
         new ExportedRoute(route.name(), route.track(), route.ascent(), route.descent()));

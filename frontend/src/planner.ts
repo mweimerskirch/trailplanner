@@ -1,4 +1,4 @@
-import { computed, ref, shallowRef, toRaw, watch } from 'vue'
+import { computed, nextTick, ref, shallowRef, toRaw, watch } from 'vue'
 import { api, ApiError } from './api'
 import { DEFAULT_PREFERENCES } from './constants'
 import type {
@@ -14,6 +14,7 @@ import type {
   Waypoint,
   WayCategory,
 } from './types'
+import { createHistory } from './history'
 import { inserted, legType, removed, reversed, withLegType } from './waypoints'
 
 /**
@@ -61,8 +62,11 @@ interface StoredState {
   preferences?: Partial<RoutingPreferences>
   routeName?: string
   routeId?: number | null
+  routeUpdatedAt?: string | null
+  hasOriginal?: boolean
   speed?: number
-  fixedTrack?: FixedTrack | null
+  /** An imported route is open in view mode; its track is fetched again on load. */
+  viewOnly?: boolean
 }
 
 function loadStored(key: string): StoredState {
@@ -95,6 +99,10 @@ export const preferences = ref<RoutingPreferences>(mergePreferences(undefined))
 export const routeName = ref('MTB tour')
 /** Id of the saved route being edited, or null for a new, unsaved route. */
 export const routeId = ref<number | null>(null)
+/** The open route's updatedAt as last loaded or saved; sent with saves to detect conflicts. */
+export const routeUpdatedAt = ref<string | null>(null)
+/** The open route is an import whose original track is kept (restorable, downloadable). */
+export const hasOriginal = ref(false)
 /** Average speed on the flat in km/h, for the time estimate only. */
 export const speed = ref(16)
 /** Set while an imported, not yet converted route is open (view mode). */
@@ -111,25 +119,26 @@ export const flyTarget = ref<GeoPoint | null>(null)
 export const libraryVersion = ref(0)
 
 /**
- * One undo step. `route` is only recorded when the step switches routes (open, new), so undoing
- * it also restores which saved route is being edited; otherwise "Save changes" after an undo
- * would overwrite the opened route with the previous route's waypoints.
+ * One undo step: the whole planner state, so undo never mixes one route's waypoints with another
+ * route's identity, and preference changes are undoable too.
  */
-interface HistoryEntry {
+interface Snapshot {
   waypoints: Waypoint[]
-  route?: {
-    id: number | null
-    name: string
-    preferences: RoutingPreferences
-    fixedTrack: FixedTrack | null
-  }
+  routeId: number | null
+  routeName: string
+  routeUpdatedAt: string | null
+  hasOriginal: boolean
+  preferences: RoutingPreferences
+  fixedTrack: FixedTrack | null
 }
 
-const history: HistoryEntry[] = []
+const history = createHistory<Snapshot>(MAX_HISTORY)
 export const canUndo = ref(false)
+/** True while the planner applies a snapshot or loads state; such changes are not undo steps. */
+let restoring = false
 
 watch(
-  [waypoints, preferences, routeName, routeId, speed, fixedTrack],
+  [waypoints, preferences, routeName, routeId, routeUpdatedAt, hasOriginal, speed, fixedTrack],
   () => {
     if (!storageKey) return
     const state: StoredState = {
@@ -137,8 +146,10 @@ watch(
       preferences: preferences.value,
       routeName: routeName.value,
       routeId: routeId.value,
+      routeUpdatedAt: routeUpdatedAt.value,
+      hasOriginal: hasOriginal.value,
       speed: speed.value,
-      fixedTrack: fixedTrack.value,
+      viewOnly: fixedTrack.value !== null,
     }
     try {
       localStorage.setItem(storageKey, JSON.stringify(state))
@@ -167,13 +178,19 @@ export function activateRider(riderId: number) {
   if (storageKey === key) return
   storageKey = key
   const stored = loadStored(key)
-  fixedTrack.value = stored.fixedTrack ?? null
-  waypoints.value = stored.waypoints ?? []
-  preferences.value = mergePreferences(stored.preferences)
-  routeName.value = stored.routeName ?? 'MTB tour'
-  routeId.value = stored.routeId ?? null
-  speed.value = stored.speed ?? 16
-  history.length = 0
+  applyQuietly(() => {
+    fixedTrack.value = null
+    waypoints.value = stored.waypoints ?? []
+    preferences.value = mergePreferences(stored.preferences)
+    routeName.value = stored.routeName ?? 'MTB tour'
+    routeId.value = stored.routeId ?? null
+    routeUpdatedAt.value = stored.routeUpdatedAt ?? null
+    hasOriginal.value = stored.hasOriginal ?? false
+    speed.value = stored.speed ?? 16
+  })
+  // An imported route was open in view mode: fetch its track again (it is not kept in storage).
+  if (stored.viewOnly && stored.routeId != null) void reloadViewOnly(stored.routeId)
+  history.clear()
   canUndo.value = false
   status.value = null
   hoverIndex.value = null
@@ -183,22 +200,32 @@ export function activateRider(riderId: number) {
 
 // ---------- editing ----------
 
-export function remember(includeRoute = false) {
-  history.push({
+function snapshot(): Snapshot {
+  return {
     waypoints: waypoints.value.map((p) => ({ ...p })),
-    ...(includeRoute
-      ? {
-          route: {
-            id: routeId.value,
-            name: routeName.value,
-            preferences: structuredClone(toRaw(preferences.value)),
-            fixedTrack: fixedTrack.value,
-          },
-        }
-      : {}),
-  })
-  if (history.length > MAX_HISTORY) history.shift()
+    routeId: routeId.value,
+    routeName: routeName.value,
+    routeUpdatedAt: routeUpdatedAt.value,
+    hasOriginal: hasOriginal.value,
+    preferences: structuredClone(toRaw(preferences.value)),
+    fixedTrack: fixedTrack.value,
+  }
+}
+
+/** Records the current state as an undo step, before a change. */
+export function remember() {
+  history.push(snapshot())
   canUndo.value = true
+}
+
+/** Applies state without recording it as an undo step (undo, opening a route, loading). */
+function applyQuietly(change: () => void) {
+  restoring = true
+  change()
+  void nextTick(() => {
+    restoring = false
+    preferencesBefore = structuredClone(toRaw(preferences.value))
+  })
 }
 
 /** Applies a change to the waypoint list (as a new list, so watchers see it). */
@@ -244,35 +271,56 @@ export const clearRoute = () => {
 export function undo() {
   const previous = history.pop()
   if (previous) {
-    waypoints.value = previous.waypoints
-    if (previous.route) {
-      routeId.value = previous.route.id
-      routeName.value = previous.route.name
-      preferences.value = previous.route.preferences
-      fixedTrack.value = previous.route.fixedTrack
-    }
+    applyQuietly(() => {
+      waypoints.value = previous.waypoints
+      routeId.value = previous.routeId
+      routeName.value = previous.routeName
+      routeUpdatedAt.value = previous.routeUpdatedAt
+      hasOriginal.value = previous.hasOriginal
+      preferences.value = previous.preferences
+      fixedTrack.value = previous.fixedTrack
+    })
   }
-  canUndo.value = history.length > 0
+  canUndo.value = history.size > 0
 }
 
 export function newRoute() {
-  if (waypoints.value.length > 0 || routeId.value !== null || fixedTrack.value) remember(true)
+  if (waypoints.value.length > 0 || routeId.value !== null || fixedTrack.value) remember()
   fixedTrack.value = null
   edit(() => [], false)
   routeId.value = null
+  routeUpdatedAt.value = null
+  hasOriginal.value = false
   routeName.value = 'MTB tour'
 }
 
 export function openRoute(route: RouteDetails) {
-  remember(true)
-  fixedTrack.value = route.editable
-    ? null
-    : { points: route.track, distance: route.distance, ascent: route.ascent }
-  waypoints.value = route.waypoints.map((p) => ({ ...p }))
-  preferences.value = mergePreferences(route.preferences)
-  routeName.value = route.name
-  routeId.value = route.id
+  remember()
+  applyQuietly(() => {
+    fixedTrack.value = route.editable
+      ? null
+      : { points: route.track, distance: route.distance, ascent: route.ascent }
+    waypoints.value = route.waypoints.map((p) => ({ ...p }))
+    preferences.value = mergePreferences(route.preferences)
+    routeName.value = route.name
+    routeId.value = route.id
+    routeUpdatedAt.value = route.updatedAt
+    hasOriginal.value = route.hasOriginal
+  })
   fitRequest.value++
+}
+
+async function reloadViewOnly(id: number) {
+  try {
+    const route = await api.getRoute(id)
+    if (!route.editable && routeId.value === id) {
+      applyQuietly(() => {
+        fixedTrack.value = { points: route.track, distance: route.distance, ascent: route.ascent }
+      })
+    }
+  } catch {
+    // Deleted meanwhile: the planner stays empty for this route.
+  }
 }
 
 /** True while the server converts an imported route into waypoints. */
@@ -292,7 +340,7 @@ export async function editImportedRoute() {
   setStatus('Matching the original track with the router…')
   try {
     const result = await api.convertRoute(id, preferences.value)
-    remember(true)
+    remember()
     fixedTrack.value = null
     waypoints.value = result.waypoints
     const notes = [
@@ -312,6 +360,29 @@ export async function editImportedRoute() {
     setStatus(error instanceof Error ? error.message : 'Converting the route failed.', 'error')
   } finally {
     converting.value = false
+  }
+}
+
+/** Remembers a saved version of the open route (after saving or renaming). */
+export function savedAs(route: RouteDetails) {
+  routeId.value = route.id
+  routeName.value = route.name
+  routeUpdatedAt.value = route.updatedAt
+  hasOriginal.value = route.hasOriginal
+}
+
+/**
+ * Puts the open imported route's original track back. Undo returns to the edited version, which
+ * can then be saved as a new route.
+ */
+export async function revertToOriginal() {
+  const id = routeId.value
+  if (id === null) return
+  try {
+    openRoute(await api.revertRoute(id))
+    setStatus('Back to the original track.', 'info', 3000)
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Could not restore the original.', 'error')
   }
 }
 
@@ -416,11 +487,24 @@ async function recalculate() {
 
 let preferenceTimer: ReturnType<typeof setTimeout> | undefined
 watch(waypoints, () => void recalculate(), { immediate: true })
+/** Preferences before the current burst of changes (e.g. while a slider is being dragged). */
+let preferencesBefore = structuredClone(toRaw(preferences.value))
+let preferenceBurst = false
 watch(
   preferences,
   () => {
+    // A burst of preference changes is one undo step, holding the preferences from before it.
+    if (!restoring && !preferenceBurst) {
+      history.push({ ...snapshot(), preferences: preferencesBefore })
+      canUndo.value = true
+      preferenceBurst = true
+    }
     clearTimeout(preferenceTimer)
-    preferenceTimer = setTimeout(() => void recalculate(), 400)
+    preferenceTimer = setTimeout(() => {
+      preferenceBurst = false
+      preferencesBefore = structuredClone(toRaw(preferences.value))
+      void recalculate()
+    }, 400)
   },
   { deep: true },
 )

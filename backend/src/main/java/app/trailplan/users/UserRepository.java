@@ -1,5 +1,6 @@
 package app.trailplan.users;
 
+import app.trailplan.db.Timestamps;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -24,8 +25,8 @@ public class UserRepository {
     return jdbc.sql(
             """
             SELECT u.id, u.name,
-              (SELECT COUNT(*) FROM route r WHERE r.user_id = u.id AND r.deleted_at IS NULL) AS routes
-            FROM app_user u ORDER BY u.name COLLATE NOCASE, u.id
+              (SELECT COUNT(*) FROM route r WHERE r.rider_id = u.id AND r.deleted_at IS NULL) AS routes
+            FROM rider u ORDER BY u.name COLLATE NOCASE, u.id
             """)
         .query((rs, row) ->
             new UserSummary(rs.getLong("id"), rs.getString("name"), rs.getInt("routes")))
@@ -33,7 +34,7 @@ public class UserRepository {
   }
 
   public Optional<CurrentUser> findById(long id) {
-    return jdbc.sql("SELECT id, name FROM app_user WHERE id = :id")
+    return jdbc.sql("SELECT id, name FROM rider WHERE id = :id")
         .param("id", id)
         .query((rs, row) -> new CurrentUser(rs.getLong("id"), rs.getString("name")))
         .optional();
@@ -41,9 +42,9 @@ public class UserRepository {
 
   public long insert(String name, Instant now) {
     KeyHolder keys = new GeneratedKeyHolder();
-    jdbc.sql("INSERT INTO app_user (name, created_at) VALUES (:name, :now)")
+    jdbc.sql("INSERT INTO rider (name, created_at) VALUES (:name, :now)")
         .param("name", name)
-        .param("now", now.toString())
+        .param("now", Timestamps.format(now))
         .update(keys);
     Number key = keys.getKey();
     if (key == null) {
@@ -53,7 +54,7 @@ public class UserRepository {
   }
 
   public boolean rename(long id, String name) {
-    return jdbc.sql("UPDATE app_user SET name = :name WHERE id = :id")
+    return jdbc.sql("UPDATE rider SET name = :name WHERE id = :id")
             .param("id", id)
             .param("name", name)
             .update()
@@ -62,6 +63,6 @@ public class UserRepository {
 
   /** Deletes the rider with all their routes and cloud connections (foreign keys cascade). */
   public boolean delete(long id) {
-    return jdbc.sql("DELETE FROM app_user WHERE id = :id").param("id", id).update() == 1;
+    return jdbc.sql("DELETE FROM rider WHERE id = :id").param("id", id).update() == 1;
   }
 }

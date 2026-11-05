@@ -76,6 +76,10 @@ public class DeviceService {
           HttpStatus.CONFLICT, "Connect your " + cloud.serviceName() + " account first.");
     }
     StoredRoute route = routes.get(user, routeId);
+    if (route.deletedAt().isPresent()) {
+      throw new DeviceException(
+          HttpStatus.CONFLICT, "This route is in the trash. Restore it before sending it.");
+    }
     Optional<String> existing = links.findRemoteId(routeId, cloud.service());
     String remoteId;
     try {
@@ -83,15 +87,28 @@ public class DeviceService {
     } catch (CloudRouteGoneException e) {
       // Deleted on the cloud side: forget the link and create the route again.
       links.delete(routeId, cloud.service());
-      remoteId = cloud.upload(user, route, Optional.empty());
+      try {
+        remoteId = cloud.upload(user, route, Optional.empty());
+      } catch (CloudRouteGoneException again) {
+        throw new DeviceException(
+            HttpStatus.BAD_GATEWAY,
+            cloud.serviceName() + " did not accept the route. Try again later.",
+            again);
+      }
     }
     Instant now = clock.instant();
     links.save(routeId, cloud.service(), remoteId, now);
     return new SyncResult(cloud.service(), remoteId, now);
   }
 
+  /**
+   * Disconnects the rider's account and forgets which remote routes belong to their routes: a
+   * different account connected later must not receive updates meant for the old one.
+   */
   public void disconnect(CurrentUser user, String deviceId) {
-    cloud(deviceId).disconnect(user);
+    CloudSync cloud = cloud(deviceId);
+    cloud.disconnect(user);
+    links.deleteForRider(user.id(), cloud.service());
   }
 
   private CloudSync cloud(String deviceId) {

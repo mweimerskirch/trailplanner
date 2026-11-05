@@ -1,5 +1,6 @@
 package app.trailplan.devices;
 
+import app.trailplan.db.Timestamps;
 import java.time.Instant;
 import java.util.Optional;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -38,7 +39,19 @@ public class CloudLinkRepository {
         .param("route", routeId)
         .param("service", service)
         .param("remote", remoteId)
-        .param("at", syncedAt.toString())
+        .param("at", Timestamps.format(syncedAt))
+        .update();
+  }
+
+  /** Forgets all of a rider's links to a service, e.g. when they disconnect the account. */
+  public void deleteForRider(long userId, String service) {
+    jdbc.sql(
+            """
+            DELETE FROM route_cloud_link WHERE service = :service
+              AND route_id IN (SELECT id FROM route WHERE rider_id = :user)
+            """)
+        .param("user", userId)
+        .param("service", service)
         .update();
   }
 

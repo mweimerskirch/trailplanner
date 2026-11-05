@@ -123,10 +123,76 @@ class RouteLibraryTest {
     assertThat(http.get("/api/routes/" + id).body())
         .contains("\"waypoints\":[]")
         .contains("\"track\":[[6.13,49.61,300.0],[6.14,49.62,320.0]]");
-    assertThat(repository.findActiveIdByExternalId(rider, "komoot:42")).contains(id);
+    assertThat(repository.findByExternalId(rider, "komoot:42"))
+        .hasValueSatisfying(m -> assertThat(m.trashed()).isFalse());
 
     http.send("DELETE", "/api/routes/" + id, null);
-    assertThat(repository.findActiveIdByExternalId(rider, "komoot:42")).isEmpty();
+    assertThat(repository.findByExternalId(rider, "komoot:42"))
+        .hasValueSatisfying(m -> assertThat(m.trashed()).isTrue());
+  }
+
+  @Test
+  void editingAnImportKeepsTheOriginalWhichCanBeRestored() throws Exception {
+    long id =
+        repository.insertImported(
+            rider,
+            new ImportedRoute("Komoot tour", RouteSource.KOMOOT, "komoot:7", TRACK, 1500, 20, 5),
+            Instant.parse("2026-01-01T00:00:00Z"));
+    // Saving the edited route (as the planner does after "Edit route") replaces the track...
+    List<TrackPoint> edited =
+        List.of(new TrackPoint(6.13, 49.61, 300.0), new TrackPoint(6.15, 49.63, 330.0));
+    repository.update(
+        rider,
+        id,
+        new RouteDraft(
+            "Komoot tour",
+            List.of(Waypoint.of(49.61, 6.13), Waypoint.of(49.63, 6.15)),
+            RoutingPreferences.defaults()),
+        new PlannedRoute(edited, 2600, 30, 0, LegBreakdown.empty()),
+        Instant.parse("2026-01-02T00:00:00Z"),
+        null);
+    assertThat(http.get("/api/routes/" + id).body())
+        .contains("\"editable\":true")
+        .contains("\"hasOriginal\":true")
+        .contains("[6.15,49.63,330.0]");
+
+    // ...but the original is still there: as a download, and restorable.
+    assertThat(http.get("/api/routes/" + id + "/export/gpx?original=true").body())
+        .contains("lat=\"49.620000\" lon=\"6.140000\"")
+        .doesNotContain("49.630000");
+    String reverted = http.send("POST", "/api/routes/" + id + "/revert", null).body();
+    assertThat(reverted)
+        .contains("\"editable\":false")
+        .contains("\"waypoints\":[]")
+        .contains("\"track\":[[6.13,49.61,300.0],[6.14,49.62,320.0]]")
+        .contains("\"distance\":1500.0");
+
+    long planned = plannedRoute("Planned");
+    assertThat(http.send("POST", "/api/routes/" + planned + "/revert", null).body())
+        .contains("\"reason\":\"NO_ORIGINAL\"");
+  }
+
+  @Test
+  void routesInTheTrashOrChangedElsewhereAreNotOverwritten() throws Exception {
+    long id = plannedRoute("Tour");
+    String updatedAt =
+        http.get("/api/routes/" + id).body().replaceAll(".*\"updatedAt\":\"([^\"]+)\".*", "$1");
+    String draft =
+        "{\"name\":\"Tour\",\"waypoints\":[{\"lat\":49.61,\"lng\":6.13},{\"lat\":49.62,"
+            + "\"lng\":6.14}],\"preferences\":{},\"expectedUpdatedAt\":\"%s\"}";
+
+    // Saved elsewhere in the meantime (here: a rename), so the planner's version is outdated.
+    http.send("PATCH", "/api/routes/" + id, "{\"name\":\"Renamed elsewhere\"}");
+    var outdated = http.send("PUT", "/api/routes/" + id, draft.formatted(updatedAt));
+    assertThat(outdated.statusCode()).isEqualTo(409);
+    assertThat(outdated.body()).contains("\"reason\":\"CHANGED_ELSEWHERE\"");
+
+    http.send("DELETE", "/api/routes/" + id, null);
+    var trashed = http.send("PATCH", "/api/routes/" + id, "{\"name\":\"x\"}");
+    assertThat(trashed.statusCode()).isEqualTo(409);
+    assertThat(trashed.body()).contains("\"reason\":\"IN_TRASH\"");
+    assertThat(http.send("PUT", "/api/routes/" + id, draft.formatted(updatedAt)).body())
+        .contains("\"reason\":\"IN_TRASH\"");
   }
 
   @Test

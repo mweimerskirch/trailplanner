@@ -26,6 +26,8 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   optional request fields must be boxed and get their default in the record constructor (see
   `RoutingPreferences`).
 - `frontend/src/types.ts` mirrors the Java records. Keep the two in sync.
+- Errors shown to the rider are `web.ApiException`s (status, title, optional `reason` for the UI);
+  any other exception is an internal error (500).
 - Riders: there are no passwords. The chosen rider is a cookie, resolved into a `CurrentUser`
   controller parameter (401 with reason `NO_USER` if missing). Every route query must be scoped
   to the rider (`RouteRepository` methods take `userId`); cloud connections are per rider too.
@@ -51,6 +53,7 @@ and `session.ts`, not in components.
   `CloudLinkRepository`); a cloud integration needs no columns of its own.
 - Export formats: implement `export.RouteFormat` as a Spring bean. It is served at
   `/api/routes/{id}/export/{format}` and `/api/export/{format}`.
-- Database: add a new entry at the end of `DatabaseMigrations.MIGRATIONS`. Never change a released
-  entry.
+- Database: Flyway applies the SQL files in `backend/src/main/resources/db/migration` on startup.
+  For a schema change add a new `V<next>__description.sql`; never edit a released file (Flyway
+  checks checksums and refuses to start). Store timestamps with `db.Timestamps`.
 

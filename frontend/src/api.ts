@@ -51,8 +51,21 @@ export function onNoRider(handler: () => void) {
   noRiderHandler = handler
 }
 
+let riderHeader: string | null = null
+
+/**
+ * The rider this page shows. Sent with every request, so that a tab still showing another rider
+ * (switched in a different tab) is stopped instead of saving into the wrong library.
+ */
+export function setApiRider(id: number | null) {
+  riderHeader = id === null ? null : String(id)
+}
+
 async function send(path: string, init: RequestInit = {}, signal?: AbortSignal): Promise<Response> {
   const headers = new Headers(init.headers)
+  // The server only accepts changes with this header (protection against other websites).
+  headers.set('X-Trailplan-Client', 'web')
+  if (riderHeader !== null) headers.set('X-Trailplan-Rider', riderHeader)
   // FormData bodies (file uploads) need the browser's multipart Content-Type with its boundary.
   if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
@@ -167,19 +180,28 @@ export const api = {
   },
 
   /** The route in the planner as a file in the given format; the track is recalculated. */
-  async exportDraft(format: string, draft: RouteDraft): Promise<Blob> {
+  async exportDraft(format: string, draft: RouteDraft): Promise<File> {
     const response = await send(`/api/export/${format}`, {
       method: 'POST',
       body: JSON.stringify(draft),
       headers: { Accept: '*/*' },
     })
-    return response.blob()
+    return toFile(response)
   },
 
-  /** A saved route as a file, with its stored track (the original one for imported routes). */
-  async exportSaved(id: number, format: string): Promise<Blob> {
-    const response = await send(`/api/routes/${id}/export/${format}`, { headers: { Accept: '*/*' } })
-    return response.blob()
+  /**
+   * A saved route as a file with its stored track; with `original`, an imported route's original
+   * track as imported, even after it was edited.
+   */
+  async exportSaved(id: number, format: string, original = false): Promise<File> {
+    const query = original ? '?original=true' : ''
+    const response = await send(`/api/routes/${id}/export/${format}${query}`, { headers: { Accept: '*/*' } })
+    return toFile(response)
+  },
+
+  /** Puts an imported route's original track back; it is view-only again. */
+  revertRoute(id: number) {
+    return json<RouteDetails>(`/api/routes/${id}/revert`, { method: 'POST' })
   },
 
   devices() {
@@ -250,6 +272,14 @@ export const api = {
       body: JSON.stringify({ tourIds }),
     })
   },
+}
+
+/** The response as a file named the way the server suggests (Content-Disposition). */
+async function toFile(response: Response): Promise<File> {
+  const disposition = response.headers.get('Content-Disposition') ?? ''
+  const name = /filename="?([^";]+)"?/.exec(disposition)?.[1] ?? 'route'
+  const blob = await response.blob()
+  return new File([blob], name, { type: blob.type })
 }
 
 export interface Place {

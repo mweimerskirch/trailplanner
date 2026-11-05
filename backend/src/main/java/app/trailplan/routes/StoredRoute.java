@@ -8,15 +8,16 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A saved route as stored in the database, including the calculated track.
+ * A saved route as stored in the database, including the current track.
  *
- * <p>Imported routes have no waypoints until the rider converts them for editing; until then the
- * stored track is the original, imported one.
+ * <p>Imported routes are not {@code editable} until the rider converts them; until then they have
+ * no waypoints and the track is the imported one. Their {@code original} is kept for good.
  */
 public record StoredRoute(
     long id,
     String name,
     List<Waypoint> waypoints,
+    boolean editable,
     RoutingPreferences preferences,
     List<TrackPoint> track,
     double distance,
@@ -27,16 +28,12 @@ public record StoredRoute(
     RouteSource source,
     Optional<String> externalId,
     Optional<Instant> deletedAt,
-    Optional<Instant> archivedAt) {
+    Optional<Instant> archivedAt,
+    Optional<OriginalTrack> original) {
 
   public StoredRoute {
     waypoints = List.copyOf(waypoints);
     track = List.copyOf(track);
-  }
-
-  /** False for imported routes that have not been converted to waypoints yet. */
-  public boolean editable() {
-    return !waypoints.isEmpty();
   }
 
   public RouteDetails details() {
@@ -52,7 +49,8 @@ public record StoredRoute(
         createdAt,
         updatedAt,
         source,
-        editable(),
+        editable,
+        original.isPresent(),
         deletedAt.orElse(null),
         archivedAt.orElse(null));
   }

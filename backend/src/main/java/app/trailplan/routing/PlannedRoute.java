@@ -37,6 +37,19 @@ public record PlannedRoute(
       ascent += leg.ascent();
       breakdown = breakdown.plus(leg.breakdown());
     }
-    return new PlannedRoute(points, distance, ascent, TrackStats.descent(points), breakdown);
+    return new PlannedRoute(points, distance, ascent, descent(points, ascent), breakdown);
+  }
+
+  /**
+   * Descent consistent with the router's filtered ascent: what goes up and does not end higher
+   * comes down again. Falls back to our own estimate when the ends have no elevation.
+   */
+  private static double descent(List<TrackPoint> points, double ascent) {
+    Double first = points.isEmpty() ? null : points.getFirst().ele();
+    Double last = points.isEmpty() ? null : points.getLast().ele();
+    if (first == null || last == null) {
+      return TrackStats.descent(points);
+    }
+    return Math.max(0, ascent - (last - first));
   }
 }

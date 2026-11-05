@@ -185,7 +185,7 @@ public class KomootClient {
     String message =
         e instanceof ResourceAccessException
             ? "Komoot is not reachable. Check the internet connection of the server."
-            : "Komoot request failed: " + e.getMessage();
+            : "Komoot did not answer as expected. Try again later, or import GPX files instead.";
     return new KomootException(HttpStatus.BAD_GATEWAY, message, e);
   }
 }
