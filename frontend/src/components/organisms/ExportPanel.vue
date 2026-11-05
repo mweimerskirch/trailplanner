@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '@/api'
+import StarToggle from '@/components/atoms/StarToggle.vue'
 import * as planner from '@/planner'
 import { currentRider } from '@/session'
 import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
@@ -147,7 +148,15 @@ onMounted(async () => {
     <h2 id="export-heading">Save &amp; send</h2>
     <div class="field">
       <label for="route-name">Route name</label>
-      <input id="route-name" v-model="planner.routeName.value" type="text" maxlength="120" />
+      <div class="name-row">
+        <input id="route-name" v-model="planner.routeName.value" type="text" maxlength="120" />
+        <StarToggle
+          v-if="planner.routeId.value !== null"
+          :starred="planner.favorite.value"
+          :label="planner.routeName.value || 'this route'"
+          @toggle="void planner.toggleFavorite()"
+        />
+      </div>
     </div>
     <div class="row">
       <button type="button" class="primary" :disabled="!ready" @click="save(false)">
@@ -221,6 +230,11 @@ onMounted(async () => {
 </template>
 
 <style scoped>
+.name-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 .row + .row,
 .device + .row {
   margin-top: 8px;

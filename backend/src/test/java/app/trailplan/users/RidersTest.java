@@ -94,6 +94,13 @@ class RidersTest {
         .contains("{\"id\":" + id + ",\"name\":\"Carla M.\",\"routes\":1}");
     assertThat(http.send("POST", "/api/users", "{\"name\":\"\"}").statusCode()).isEqualTo(400);
 
+    // Only the main list counts: archived and trashed routes do not.
+    long archived = route(id, "Archived loop");
+    long trashed = route(id, "Trashed loop");
+    http.send("POST", "/api/routes/" + archived + "/archive", null);
+    http.send("DELETE", "/api/routes/" + trashed, null);
+    assertThat(http.get("/api/users").body()).contains("\"name\":\"Carla M.\",\"routes\":1}");
+
     assertThat(http.send("DELETE", "/api/users/" + id, null).statusCode()).isEqualTo(204);
     assertThat(http.get("/api/users").body()).doesNotContain("Carla");
     assertThat(routes.findActiveSummaries(id)).isEmpty(); // routes went with the rider

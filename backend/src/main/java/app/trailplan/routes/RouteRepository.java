@@ -33,7 +33,7 @@ public class RouteRepository {
 
   private static final String SUMMARY_COLUMNS =
       """
-      id, name, distance_m, ascent_m, updated_at, source, deleted_at, archived_at,
+      id, name, distance_m, ascent_m, updated_at, source, deleted_at, archived_at, favorite,
       waypoints_json IS NOT NULL AS editable
       """;
 
@@ -260,6 +260,16 @@ public class RouteRepository {
     return rows == 1 ? Optional.of(generatedId(keys)) : Optional.empty();
   }
 
+  /** Stars or unstars a route. Not a change of the route itself, so updated_at stays. */
+  public boolean setFavorite(long userId, long id, boolean favorite) {
+    return jdbc.sql("UPDATE route SET favorite = :favorite WHERE id = :id AND rider_id = :user")
+            .param("id", id)
+            .param("user", userId)
+            .param("favorite", favorite ? 1 : 0)
+            .update()
+        == 1;
+  }
+
   /** Archives or unarchives a route. False if it does not exist. */
   public boolean setArchived(long userId, long id, Instant archivedAt) {
     return jdbc.sql("UPDATE route SET archived_at = :at WHERE id = :id AND rider_id = :user")
@@ -322,7 +332,8 @@ public class RouteRepository {
         RouteSource.valueOf(rs.getString("source")),
         rs.getBoolean("editable"),
         Timestamps.parse(rs.getString("deleted_at")),
-        Timestamps.parse(rs.getString("archived_at")));
+        Timestamps.parse(rs.getString("archived_at")),
+        rs.getBoolean("favorite"));
   }
 
   private StoredRoute map(ResultSet rs, int row) throws SQLException {
@@ -344,6 +355,7 @@ public class RouteRepository {
         Optional.ofNullable(rs.getString("external_id")),
         Optional.ofNullable(Timestamps.parse(rs.getString("deleted_at"))),
         Optional.ofNullable(Timestamps.parse(rs.getString("archived_at"))),
+        rs.getBoolean("favorite"),
         original == null ? Optional.empty() : Optional.of(read(original, ORIGINAL)));
   }
 

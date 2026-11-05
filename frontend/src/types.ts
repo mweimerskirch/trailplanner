@@ -78,6 +78,8 @@ export interface RouteSummary {
   deletedAt: string | null
   /** Set while the route is archived (out of the main list, but kept). */
   archivedAt: string | null
+  /** Starred by the rider. */
+  favorite: boolean
 }
 
 export interface RouteDetails {
@@ -99,6 +101,7 @@ export interface RouteDetails {
   hasOriginal: boolean
   deletedAt: string | null
   archivedAt: string | null
+  favorite: boolean
 }
 
 export interface FormatInfo {

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { RouterView } from 'vue-router'
+import ConfirmDialog from './components/molecules/ConfirmDialog.vue'
 import AppHeader from './components/organisms/AppHeader.vue'
 import { setStatus } from './planner'
 
@@ -26,6 +27,7 @@ onMounted(() => {
         </KeepAlive>
       </RouterView>
     </div>
+    <ConfirmDialog />
   </div>
 </template>
 

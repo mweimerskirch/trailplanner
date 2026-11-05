@@ -5,7 +5,7 @@ import { api } from '@/api'
 import * as planner from '@/planner'
 import type { RouteSummary } from '@/types'
 
-/** The three most recently changed routes, for quick access; the full library is its own page. */
+/** Three routes for quick access, favorites first; the full library is its own page. */
 const recent = ref<RouteSummary[]>([])
 const total = ref(0)
 
@@ -13,7 +13,8 @@ async function load() {
   try {
     const routes = await api.listRoutes()
     total.value = routes.length
-    recent.value = routes.slice(0, 3)
+    // Favorites first (most recently changed among them), then the most recently changed others.
+    recent.value = [...routes.filter((r) => r.favorite), ...routes.filter((r) => !r.favorite)].slice(0, 3)
   } catch {
     recent.value = []
   }
@@ -36,7 +37,9 @@ watch(planner.libraryVersion, load)
     <h2 id="library-shortcut-heading">Library</h2>
     <ul v-if="recent.length">
       <li v-for="r in recent" :key="r.id" :class="{ current: r.id === planner.routeId.value }">
-        <button type="button" class="name" :title="`Open ${r.name}`" @click="open(r.id)">{{ r.name }}</button>
+        <button type="button" class="name" :title="`Open ${r.name}`" @click="open(r.id)">
+          <span v-if="r.favorite" class="fav" aria-label="Favorite">★</span>{{ r.name }}
+        </button>
         <span class="meta">{{ (r.distance / 1000).toFixed(1) }} km</span>
       </li>
     </ul>
@@ -74,6 +77,10 @@ li.current .name {
   background: none;
   border: none;
   padding: 2px;
+}
+.fav {
+  color: #e0a800;
+  margin-right: 4px;
 }
 .meta {
   color: var(--muted);

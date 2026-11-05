@@ -151,6 +151,10 @@ export const api = {
     await send(`/api/routes/${id}`, { method: 'DELETE' })
   },
 
+  setFavorite(id: number, favorite: boolean) {
+    return json<RouteDetails>(`/api/routes/${id}/favorite`, { method: favorite ? 'PUT' : 'DELETE' })
+  },
+
   listArchive() {
     return json<RouteSummary[]>('/api/routes/archive')
   },

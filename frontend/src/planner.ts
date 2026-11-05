@@ -64,6 +64,7 @@ interface StoredState {
   routeId?: number | null
   routeUpdatedAt?: string | null
   hasOriginal?: boolean
+  favorite?: boolean
   speed?: number
   /** An imported route is open in view mode; its track is fetched again on load. */
   viewOnly?: boolean
@@ -103,6 +104,8 @@ export const routeId = ref<number | null>(null)
 export const routeUpdatedAt = ref<string | null>(null)
 /** The open route is an import whose original track is kept (restorable, downloadable). */
 export const hasOriginal = ref(false)
+/** The open saved route is starred. */
+export const favorite = ref(false)
 /** Average speed on the flat in km/h, for the time estimate only. */
 export const speed = ref(16)
 /** Set while an imported, not yet converted route is open (view mode). */
@@ -128,6 +131,7 @@ interface Snapshot {
   routeName: string
   routeUpdatedAt: string | null
   hasOriginal: boolean
+  favorite: boolean
   preferences: RoutingPreferences
   fixedTrack: FixedTrack | null
 }
@@ -138,7 +142,7 @@ export const canUndo = ref(false)
 let restoring = false
 
 watch(
-  [waypoints, preferences, routeName, routeId, routeUpdatedAt, hasOriginal, speed, fixedTrack],
+  [waypoints, preferences, routeName, routeId, routeUpdatedAt, hasOriginal, favorite, speed, fixedTrack],
   () => {
     if (!storageKey) return
     const state: StoredState = {
@@ -148,6 +152,7 @@ watch(
       routeId: routeId.value,
       routeUpdatedAt: routeUpdatedAt.value,
       hasOriginal: hasOriginal.value,
+      favorite: favorite.value,
       speed: speed.value,
       viewOnly: fixedTrack.value !== null,
     }
@@ -186,6 +191,7 @@ export function activateRider(riderId: number) {
     routeId.value = stored.routeId ?? null
     routeUpdatedAt.value = stored.routeUpdatedAt ?? null
     hasOriginal.value = stored.hasOriginal ?? false
+    favorite.value = stored.favorite ?? false
     speed.value = stored.speed ?? 16
   })
   // An imported route was open in view mode: fetch its track again (it is not kept in storage).
@@ -207,6 +213,7 @@ function snapshot(): Snapshot {
     routeName: routeName.value,
     routeUpdatedAt: routeUpdatedAt.value,
     hasOriginal: hasOriginal.value,
+    favorite: favorite.value,
     preferences: structuredClone(toRaw(preferences.value)),
     fixedTrack: fixedTrack.value,
   }
@@ -277,6 +284,7 @@ export function undo() {
       routeName.value = previous.routeName
       routeUpdatedAt.value = previous.routeUpdatedAt
       hasOriginal.value = previous.hasOriginal
+      favorite.value = previous.favorite
       preferences.value = previous.preferences
       fixedTrack.value = previous.fixedTrack
     })
@@ -291,6 +299,7 @@ export function newRoute() {
   routeId.value = null
   routeUpdatedAt.value = null
   hasOriginal.value = false
+  favorite.value = false
   routeName.value = 'MTB tour'
 }
 
@@ -306,6 +315,7 @@ export function openRoute(route: RouteDetails) {
     routeId.value = route.id
     routeUpdatedAt.value = route.updatedAt
     hasOriginal.value = route.hasOriginal
+    favorite.value = route.favorite
   })
   fitRequest.value++
 }
@@ -369,6 +379,7 @@ export function savedAs(route: RouteDetails) {
   routeName.value = route.name
   routeUpdatedAt.value = route.updatedAt
   hasOriginal.value = route.hasOriginal
+  favorite.value = route.favorite
 }
 
 /**
@@ -383,6 +394,19 @@ export async function revertToOriginal() {
     setStatus('Back to the original track.', 'info', 3000)
   } catch (error) {
     setStatus(error instanceof Error ? error.message : 'Could not restore the original.', 'error')
+  }
+}
+
+/** Stars or unstars the open saved route. */
+export async function toggleFavorite() {
+  const id = routeId.value
+  if (id === null) return
+  try {
+    const route = await api.setFavorite(id, !favorite.value)
+    favorite.value = route.favorite
+    libraryVersion.value++
+  } catch (error) {
+    setStatus(error instanceof Error ? error.message : 'Could not change the favorite.', 'error')
   }
 }
 

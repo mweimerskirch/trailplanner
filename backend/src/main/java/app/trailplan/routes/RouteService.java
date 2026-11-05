@@ -38,6 +38,14 @@ public class RouteService {
     return repository.findArchivedSummaries(user.id());
   }
 
+  /** Stars or unstars the route. */
+  public StoredRoute setFavorite(CurrentUser user, long id, boolean favorite) {
+    if (!repository.setFavorite(user.id(), id, favorite)) {
+      throw new RouteNotFoundException(id);
+    }
+    return get(user, id);
+  }
+
   /** Archives the route (or takes it out of the archive); it is never deleted by this. */
   public StoredRoute setArchived(CurrentUser user, long id, boolean archived) {
     if (!repository.setArchived(user.id(), id, archived ? clock.instant() : null)) {

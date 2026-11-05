@@ -4,8 +4,8 @@ import java.time.Instant;
 
 /**
  * One entry of the route library. {@code deletedAt} is null unless the route is in the trash,
- * {@code archivedAt} null unless it is archived, and {@code editable} is false for imported routes
- * that have not been converted to waypoints yet.
+ * {@code archivedAt} null unless it is archived, {@code favorite} true if starred, and {@code
+ * editable} is false for imported routes that have not been converted to waypoints yet.
  */
 public record RouteSummary(
     long id,
@@ -16,4 +16,5 @@ public record RouteSummary(
     RouteSource source,
     boolean editable,
     Instant deletedAt,
-    Instant archivedAt) {}
+    Instant archivedAt,
+    boolean favorite) {}

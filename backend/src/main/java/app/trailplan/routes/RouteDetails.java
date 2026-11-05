@@ -26,4 +26,5 @@ public record RouteDetails(
     boolean editable,
     boolean hasOriginal,
     Instant deletedAt,
-    Instant archivedAt) {}
+    Instant archivedAt,
+    boolean favorite) {}

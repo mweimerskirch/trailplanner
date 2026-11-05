@@ -2,6 +2,7 @@
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
+import { askConfirm } from '@/confirm'
 import Avatar from '@/components/atoms/Avatar.vue'
 import CenteredLayout from '@/components/templates/CenteredLayout.vue'
 import { chooseRider, currentRider, forgetRider, loadSession } from '@/session'
@@ -90,7 +91,12 @@ const remove = (rider: RiderSummary) =>
   act(async () => {
     const routes = rider.routes === 1 ? '1 route' : `${String(rider.routes)} routes`
     if (
-      !confirm(`Delete rider “${rider.name}” and ${routes} (including the trash)? This cannot be undone.`)
+      !(await askConfirm({
+        title: `Delete ${rider.name}?`,
+        message: `${rider.name} and all their routes (${routes} in the list, plus any archived or in the trash) will be deleted permanently. This cannot be undone.`,
+        confirmLabel: 'Delete rider',
+        danger: true,
+      }))
     ) {
       return
     }

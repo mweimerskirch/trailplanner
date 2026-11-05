@@ -29,6 +29,7 @@ public record StoredRoute(
     Optional<String> externalId,
     Optional<Instant> deletedAt,
     Optional<Instant> archivedAt,
+    boolean favorite,
     Optional<OriginalTrack> original) {
 
   public StoredRoute {
@@ -52,6 +53,7 @@ public record StoredRoute(
         editable,
         original.isPresent(),
         deletedAt.orElse(null),
-        archivedAt.orElse(null));
+        archivedAt.orElse(null),
+        favorite);
   }
 }

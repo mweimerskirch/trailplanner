@@ -43,6 +43,17 @@ public class RouteController {
     return routes.list(user);
   }
 
+  /** Stars a route (favorite). */
+  @PutMapping("/routes/{id}/favorite")
+  public RouteDetails favorite(CurrentUser user, @PathVariable long id) {
+    return routes.setFavorite(user, id, true).details();
+  }
+
+  @DeleteMapping("/routes/{id}/favorite")
+  public RouteDetails unfavorite(CurrentUser user, @PathVariable long id) {
+    return routes.setFavorite(user, id, false).details();
+  }
+
   @GetMapping("/routes/archive")
   public List<RouteSummary> archive(CurrentUser user) {
     return routes.archive(user);

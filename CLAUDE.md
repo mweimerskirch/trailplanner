@@ -37,11 +37,12 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 ## Frontend structure
 
 Vue components follow atomic design, one folder per level in `frontend/src/components/`:
-`atoms/` (AppLogo, Avatar, Badge, IconButton), `molecules/` (TabBar, StatusMessage, StatTile,
-WarningList, RiderMenu, BreakdownBar, PlaceSearch), `organisms/` (AppHeader, MapView,
+`atoms/` (AppLogo, Avatar, Badge, IconButton, StarToggle), `molecules/` (TabBar, StatusMessage,
+StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog), `organisms/` (AppHeader, MapView,
 ElevationChart, RouteStats, ExportPanel, ImportDialog, LibraryShortcut, PreferencesPanel) and
 `templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.
-A component may only use components from its own level or below. Shared state is in `planner.ts`
+A component may only use components from its own level or below. Ask for confirmation with
+`askConfirm()` from `confirm.ts` (shown by the one ConfirmDialog in App.vue), not `confirm()`. Shared state is in `planner.ts`
 and `session.ts`, not in components.
 
 ## Plugin points

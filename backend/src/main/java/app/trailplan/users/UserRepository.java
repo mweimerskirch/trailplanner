@@ -12,7 +12,10 @@ import org.springframework.stereotype.Repository;
 @Repository
 public class UserRepository {
 
-  /** A rider in the selection list; {@code routes} counts routes in the library (not the trash). */
+  /**
+   * A rider in the selection list; {@code routes} counts the routes in their main list (not
+   * archived, not in the trash).
+   */
   public record UserSummary(long id, String name, int routes) {}
 
   private final JdbcClient jdbc;
@@ -25,7 +28,8 @@ public class UserRepository {
     return jdbc.sql(
             """
             SELECT u.id, u.name,
-              (SELECT COUNT(*) FROM route r WHERE r.rider_id = u.id AND r.deleted_at IS NULL) AS routes
+              (SELECT COUNT(*) FROM route r
+               WHERE r.rider_id = u.id AND r.deleted_at IS NULL AND r.archived_at IS NULL) AS routes
             FROM rider u ORDER BY u.name COLLATE NOCASE, u.id
             """)
         .query((rs, row) ->

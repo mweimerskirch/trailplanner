@@ -3,11 +3,14 @@ import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import Badge from '@/components/atoms/Badge.vue'
+import StarToggle from '@/components/atoms/StarToggle.vue'
 import IconButton from '@/components/atoms/IconButton.vue'
+import SortableHeader from '@/components/molecules/SortableHeader.vue'
 import StatusMessage from '@/components/molecules/StatusMessage.vue'
 import TabBar from '@/components/molecules/TabBar.vue'
 import ImportDialog from '@/components/organisms/ImportDialog.vue'
 import PageLayout from '@/components/templates/PageLayout.vue'
+import { askConfirm } from '@/confirm'
 import * as planner from '@/planner'
 import type { RouteSource, RouteSummary } from '@/types'
 
@@ -18,8 +21,27 @@ const SOURCE_LABELS: Record<RouteSource, string> = {
   KOMOOT: 'Komoot',
 }
 
-type Sort = 'updated' | 'name' | 'distance' | 'ascent'
-type SourceFilter = 'all' | 'planned' | 'imported'
+type SortKey = 'updated' | 'name' | 'distance' | 'ascent' | 'source' | 'archived'
+type SortDir = 'asc' | 'desc'
+const SORT_STORAGE = 'trailplan.librarySort'
+/** Direction of a column's first click: names A–Z, numbers and dates biggest/newest first. */
+const FIRST_DIR: Record<SortKey, SortDir> = {
+  updated: 'desc',
+  name: 'asc',
+  distance: 'desc',
+  ascent: 'desc',
+  source: 'asc',
+  archived: 'desc',
+}
+const COMPARE: Record<SortKey, (a: RouteSummary, b: RouteSummary) => number> = {
+  updated: (a, b) => a.updatedAt.localeCompare(b.updatedAt),
+  name: (a, b) => a.name.localeCompare(b.name),
+  distance: (a, b) => a.distance - b.distance,
+  ascent: (a, b) => a.ascent - b.ascent,
+  source: (a, b) => SOURCE_LABELS[a.source].localeCompare(SOURCE_LABELS[b.source]),
+  archived: (a, b) => (a.archivedAt ?? '').localeCompare(b.archivedAt ?? ''),
+}
+type SourceFilter = 'all' | 'favorites' | 'planned' | 'imported'
 
 const router = useRouter()
 const route = useRoute()
@@ -40,7 +62,55 @@ const trash = ref<RouteSummary[]>([])
 const loading = ref(true)
 const failed = ref(false)
 const query = ref('')
-const sort = ref<Sort>('updated')
+/** Sort order of the route tables, shared by column headers and the dropdown; remembered. */
+const sort = ref<{ key: SortKey; dir: SortDir }>(loadSort())
+watch(sort, (value) => {
+  localStorage.setItem(SORT_STORAGE, JSON.stringify(value))
+})
+
+function loadSort(): { key: SortKey; dir: SortDir } {
+  try {
+    // Stored by an earlier visit, so validate it like any outside input.
+    const stored = JSON.parse(localStorage.getItem(SORT_STORAGE) ?? 'null') as {
+      key?: unknown
+      dir?: unknown
+    } | null
+    const key = stored?.key
+    const dir = stored?.dir
+    if (typeof key === 'string' && key in COMPARE && (dir === 'asc' || dir === 'desc')) {
+      return { key: key as SortKey, dir }
+    }
+  } catch {
+    // ignore a corrupt value
+  }
+  return { key: 'updated', dir: 'desc' }
+}
+
+/** Header click: sort by that column, or reverse it if it already is the sort column. */
+function sortBy(column: string) {
+  const key = column as SortKey
+  sort.value =
+    sort.value.key === key
+      ? { key, dir: sort.value.dir === 'asc' ? 'desc' : 'asc' }
+      : { key, dir: FIRST_DIR[key] }
+}
+
+/** The dropdown's value, e.g. "distance:desc" (it offers the common orders). */
+const sortChoice = computed({
+  get: () => `${sort.value.key}:${sort.value.dir}`,
+  set: (value: string) => {
+    const [key, dir] = value.split(':') as [SortKey, SortDir]
+    sort.value = { key, dir }
+  },
+})
+
+function sorted(list: RouteSummary[]): RouteSummary[] {
+  const compare = COMPARE[sort.value.key]
+  const factor = sort.value.dir === 'asc' ? 1 : -1
+  return [...list].sort((a, b) => factor * compare(a, b) || a.name.localeCompare(b.name))
+}
+
+const sortedArchive = computed(() => sorted(archived.value))
 const sourceFilter = ref<SourceFilter>('all')
 const renamingId = ref<number | null>(null)
 const renameText = ref('')
@@ -53,15 +123,12 @@ const visible = computed(() => {
   const list = routes.value.filter(
     (r) =>
       (!q || r.name.toLocaleLowerCase().includes(q)) &&
-      (sourceFilter.value === 'all' || (r.source === 'PLANNER') === (sourceFilter.value === 'planned')),
+      (sourceFilter.value === 'all' ||
+        (sourceFilter.value === 'favorites'
+          ? r.favorite
+          : (r.source === 'PLANNER') === (sourceFilter.value === 'planned'))),
   )
-  const by: Record<Sort, (a: RouteSummary, b: RouteSummary) => number> = {
-    updated: (a, b) => b.updatedAt.localeCompare(a.updatedAt),
-    name: (a, b) => a.name.localeCompare(b.name),
-    distance: (a, b) => b.distance - a.distance,
-    ascent: (a, b) => b.ascent - a.ascent,
-  }
-  return [...list].sort(by[sort.value])
+  return sorted(list)
 })
 
 async function load() {
@@ -136,6 +203,13 @@ const download = (route: RouteSummary) =>
     }, 2000)
   }, 'Could not download the route.')
 
+const toggleFavorite = (route: RouteSummary) =>
+  act(async () => {
+    const updated = await api.setFavorite(route.id, !route.favorite)
+    if (planner.routeId.value === route.id) planner.favorite.value = updated.favorite
+    planner.libraryVersion.value++
+  }, 'Could not change the favorite.')
+
 const archive = (route: RouteSummary) =>
   act(async () => {
     await api.archiveRoute(route.id)
@@ -152,6 +226,12 @@ const unarchive = (route: RouteSummary) =>
 
 const moveToTrash = (route: RouteSummary) =>
   act(async () => {
+    const ok = await askConfirm({
+      title: 'Move to trash?',
+      message: `“${route.name}” moves to the trash. You can restore it from there until you empty the trash.`,
+      confirmLabel: 'Move to trash',
+    })
+    if (!ok) return
     await api.deleteRoute(route.id)
     if (planner.routeId.value === route.id) {
       // The open route went to the trash: an imported (view-only) one is closed; an edited one
@@ -176,7 +256,16 @@ const restore = (route: RouteSummary) =>
 
 const deleteForever = (route: RouteSummary) =>
   act(async () => {
-    if (!confirm(`Delete “${route.name}” for good? This cannot be undone.`)) return
+    if (
+      !(await askConfirm({
+        title: 'Delete for good?',
+        message: `“${route.name}” will be deleted permanently. This cannot be undone.`,
+        confirmLabel: 'Delete for good',
+        danger: true,
+      }))
+    ) {
+      return
+    }
     await api.deleteRoutePermanently(route.id)
     planner.libraryVersion.value++
   }, 'Could not delete the route.')
@@ -184,7 +273,14 @@ const deleteForever = (route: RouteSummary) =>
 const emptyTrash = () =>
   act(async () => {
     const n = trash.value.length
-    if (!confirm(`Delete ${n} route${n === 1 ? '' : 's'} in the trash for good? This cannot be undone.`)) {
+    if (
+      !(await askConfirm({
+        title: 'Empty the trash?',
+        message: `${String(n)} route${n === 1 ? '' : 's'} in the trash will be deleted permanently. This cannot be undone.`,
+        confirmLabel: 'Empty trash',
+        danger: true,
+      }))
+    ) {
       return
     }
     await api.emptyTrash()
@@ -230,14 +326,20 @@ watch(planner.libraryVersion, load)
         <input v-model="query" type="search" placeholder="Search routes" aria-label="Search routes by name" />
         <select v-model="sourceFilter" aria-label="Which routes">
           <option value="all">All routes</option>
+          <option value="favorites">★ Favorites</option>
           <option value="planned">Planned in Trailplan</option>
           <option value="imported">Imported</option>
         </select>
-        <select v-model="sort" aria-label="Sort by">
-          <option value="updated">Last changed</option>
-          <option value="name">Name</option>
-          <option value="distance">Longest first</option>
-          <option value="ascent">Most climbing first</option>
+        <select v-model="sortChoice" aria-label="Sort by">
+          <option value="updated:desc">Last changed</option>
+          <option value="updated:asc">Oldest change first</option>
+          <option value="name:asc">Name A–Z</option>
+          <option value="name:desc">Name Z–A</option>
+          <option value="distance:desc">Longest first</option>
+          <option value="distance:asc">Shortest first</option>
+          <option value="ascent:desc">Most climbing first</option>
+          <option value="ascent:asc">Least climbing first</option>
+          <option value="source:asc">Source</option>
         </select>
       </div>
 
@@ -249,16 +351,54 @@ watch(planner.libraryVersion, load)
       <table v-else class="routes">
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col" class="num">Distance</th>
-            <th scope="col" class="num">Climbing</th>
-            <th scope="col" class="hide-narrow">Source</th>
-            <th scope="col" class="hide-narrow">Changed</th>
+            <th scope="col" class="star-col"><span class="visually-hidden">Favorite</span></th>
+            <SortableHeader
+              label="Name"
+              column="name"
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Distance"
+              column="distance"
+              numeric
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Climbing"
+              column="ascent"
+              numeric
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Source"
+              column="source"
+              class="hide-narrow"
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Changed"
+              column="updated"
+              class="hide-narrow"
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
             <th scope="col"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
           <tr v-for="r in visible" :key="r.id" :class="{ current: r.id === planner.routeId.value }">
+            <td class="star-col">
+              <StarToggle :starred="r.favorite" :label="r.name" @toggle="toggleFavorite(r)" />
+            </td>
             <td class="name-cell">
               <input
                 v-if="renamingId === r.id"
@@ -308,15 +448,46 @@ watch(planner.libraryVersion, load)
       <table v-if="archived.length" class="routes">
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col" class="num">Distance</th>
-            <th scope="col" class="num">Climbing</th>
-            <th scope="col" class="hide-narrow">Archived</th>
+            <th scope="col" class="star-col"><span class="visually-hidden">Favorite</span></th>
+            <SortableHeader
+              label="Name"
+              column="name"
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Distance"
+              column="distance"
+              numeric
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Climbing"
+              column="ascent"
+              numeric
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
+            <SortableHeader
+              label="Archived"
+              column="archived"
+              class="hide-narrow"
+              :sort-key="sort.key"
+              :sort-dir="sort.dir"
+              @sort="sortBy"
+            />
             <th scope="col"><span class="visually-hidden">Actions</span></th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="r in archived" :key="r.id">
+          <tr v-for="r in sortedArchive" :key="r.id">
+            <td class="star-col">
+              <StarToggle :starred="r.favorite" :label="r.name" @toggle="toggleFavorite(r)" />
+            </td>
             <td class="name-cell">
               <button type="button" class="name" :title="`Open ${r.name} in the planner`" @click="open(r.id)">
                 {{ r.name }}
@@ -433,6 +604,10 @@ tr.current .name {
 }
 td.hide-narrow {
   white-space: nowrap;
+}
+.star-col {
+  width: 1%;
+  padding-right: 0;
 }
 .num {
   text-align: right;

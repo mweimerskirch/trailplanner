@@ -229,4 +229,24 @@ class RouteLibraryTest {
     assertThat(http.get("/api/routes/archive").body()).isEqualTo("[]");
     assertThat(http.send("POST", "/api/routes/999999/archive", null).statusCode()).isEqualTo(404);
   }
+
+  @Test
+  void favoritesCanBeStarredWithoutChangingTheRoute() throws Exception {
+    long id = plannedRoute("Favourite loop");
+    String before = http.get("/api/routes/" + id).body();
+    String updatedAt = before.replaceAll(".*\"updatedAt\":\"([^\"]+)\".*", "$1");
+    assertThat(before).contains("\"favorite\":false");
+
+    assertThat(http.send("PUT", "/api/routes/" + id + "/favorite", null).body())
+        .contains("\"favorite\":true")
+        .contains("\"updatedAt\":\"" + updatedAt + "\""); // starring is not an edit
+    assertThat(http.get("/api/routes").body()).contains("\"favorite\":true");
+    // A copy starts unstarred.
+    assertThat(http.send("POST", "/api/routes/" + id + "/duplicate", null).body())
+        .contains("\"favorite\":false");
+
+    assertThat(http.send("DELETE", "/api/routes/" + id + "/favorite", null).body())
+        .contains("\"favorite\":false");
+    assertThat(http.send("PUT", "/api/routes/999999/favorite", null).statusCode()).isEqualTo(404);
+  }
 }
