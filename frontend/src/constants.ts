@@ -70,7 +70,7 @@ export const DEFAULT_PREFERENCES: RoutingPreferences = {
     MAIN_ROAD: 'AVOID',
     BUSY_ROAD: 'AVOID',
   },
-  maxDifficulty: 'S3',
+  maxDifficulty: 'S2', // matches the built-in "Flowy trails" preset, so new routes start on it
   woods: 'PREFER',
   avoidClimbs: false,
 }

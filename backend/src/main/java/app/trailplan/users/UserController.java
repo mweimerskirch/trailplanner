@@ -1,5 +1,6 @@
 package app.trailplan.users;
 
+import app.trailplan.presets.PresetService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -43,11 +44,14 @@ public class UserController {
   private final UserRepository users;
   private final CurrentUserResolver currentUser;
   private final Clock clock;
+  private final PresetService presets;
 
-  public UserController(UserRepository users, CurrentUserResolver currentUser, Clock clock) {
+  public UserController(
+      UserRepository users, CurrentUserResolver currentUser, Clock clock, PresetService presets) {
     this.users = users;
     this.currentUser = currentUser;
     this.clock = clock;
+    this.presets = presets;
   }
 
   @GetMapping("/users")
@@ -59,6 +63,7 @@ public class UserController {
   @ResponseStatus(HttpStatus.CREATED)
   public CurrentUser create(@Valid @RequestBody NameRequest request) {
     long id = users.insert(request.name().strip(), clock.instant());
+    presets.seed(id); // new riders start with the built-in riding-style presets
     return users.findById(id).orElseThrow();
   }
 

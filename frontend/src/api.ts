@@ -7,6 +7,7 @@ import type {
   ImportResult,
   KomootStatus,
   KomootTour,
+  Preset,
   Rider,
   RiderSummary,
   RouteDetails,
@@ -224,6 +225,22 @@ export const api = {
     const form = new FormData()
     for (const file of files) form.append('files', file)
     return json<ImportResult[]>('/api/import/files', { method: 'POST', body: form })
+  },
+
+  presets() {
+    return json<Preset[]>('/api/presets')
+  },
+
+  createPreset(name: string, preferences: RoutingPreferences) {
+    return json<Preset>('/api/presets', { method: 'POST', body: JSON.stringify({ name, preferences }) })
+  },
+
+  updatePreset(id: number, name: string, preferences: RoutingPreferences) {
+    return json<Preset>(`/api/presets/${id}`, { method: 'PUT', body: JSON.stringify({ name, preferences }) })
+  },
+
+  async deletePreset(id: number) {
+    await send(`/api/presets/${id}`, { method: 'DELETE' })
   },
 
   riders() {

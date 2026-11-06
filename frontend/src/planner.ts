@@ -84,7 +84,7 @@ function loadStored(key: string): StoredState {
   }
 }
 
-function mergePreferences(stored: Partial<RoutingPreferences> | undefined): RoutingPreferences {
+export function mergePreferences(stored: Partial<RoutingPreferences> | undefined): RoutingPreferences {
   return {
     ...DEFAULT_PREFERENCES,
     ...stored,

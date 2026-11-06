@@ -180,3 +180,11 @@ export interface ConversionResult {
   forcedLegs: number
   straightLegs: number
 }
+
+/** A named riding style of the rider (routing preferences). */
+export interface Preset {
+  id: number
+  name: string
+  preferences: RoutingPreferences
+  position: number
+}

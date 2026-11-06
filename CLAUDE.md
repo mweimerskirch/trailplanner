@@ -31,6 +31,8 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 - Riders: there are no passwords. The chosen rider is a cookie, resolved into a `CurrentUser`
   controller parameter (401 with reason `NO_USER` if missing). Every route query must be scoped
   to the rider (`RouteRepository` methods take `userId`); cloud connections are per rider too.
+- Riding-style presets are per rider. The built-in ones are defined only in
+  `presets.DefaultPresets`; riders get them once (`rider.presets_seeded`).
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
   `MTB_SCALE_VALUES` in `BRouterProfileGenerator` when upgrading BRouter.
 
@@ -39,11 +41,11 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 Vue components follow atomic design, one folder per level in `frontend/src/components/`:
 `atoms/` (AppLogo, Avatar, Badge, IconButton, StarToggle), `molecules/` (TabBar, StatusMessage,
 StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog), `organisms/` (AppHeader, MapView,
-ElevationChart, RouteStats, ExportPanel, ImportDialog, LibraryShortcut, PreferencesPanel) and
+ElevationChart, RouteStats, ExportPanel, ImportDialog, PreferencesPanel) and
 `templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.
 A component may only use components from its own level or below. Ask for confirmation with
-`askConfirm()` from `confirm.ts` (shown by the one ConfirmDialog in App.vue), not `confirm()`. Shared state is in `planner.ts`
-and `session.ts`, not in components.
+`askConfirm()` from `confirm.ts` (shown by the one ConfirmDialog in App.vue), not `confirm()`. Shared state is in `planner.ts`,
+`session.ts` and `presets.ts`, not in components.
 
 ## Plugin points
 

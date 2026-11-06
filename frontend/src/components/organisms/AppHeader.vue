@@ -24,8 +24,8 @@ const section = computed(() =>
 
     <template v-if="currentRider">
       <nav class="main" aria-label="Main">
-        <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">Planner</RouterLink>
         <RouterLink to="/library" :class="{ current: section === 'library' }">Library</RouterLink>
+        <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">Planner</RouterLink>
       </nav>
       <RiderMenu :rider="currentRider" class="menu" />
     </template>

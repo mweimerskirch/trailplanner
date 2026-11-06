@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import ElevationChart from '@/components/organisms/ElevationChart.vue'
 import ExportPanel from '@/components/organisms/ExportPanel.vue'
-import LibraryShortcut from '@/components/organisms/LibraryShortcut.vue'
 import MapView from '@/components/organisms/MapView.vue'
 import StatusMessage from '@/components/molecules/StatusMessage.vue'
 import PlannerLayout from '@/components/templates/PlannerLayout.vue'
@@ -60,10 +59,9 @@ const hint = computed(() => {
   <PlannerLayout>
     <template #sidebar>
       <PlaceSearch />
+      <PreferencesPanel />
       <RouteStats />
       <ExportPanel />
-      <LibraryShortcut />
-      <PreferencesPanel />
       <p class="credits">
         Map data © OpenStreetMap contributors. Routing by BRouter. Difficulty limits apply only to trails with
         an mtb:scale tag.

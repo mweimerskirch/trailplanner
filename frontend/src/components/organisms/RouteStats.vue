@@ -44,6 +44,18 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
         <StatTile :value="Math.round(planner.totals.value.ascent)" label="m climbing" />
         <StatTile :value="time" label="moving time" />
       </div>
+      <label class="speed">
+        Moving time at
+        <input
+          v-model.number="planner.speed.value"
+          type="number"
+          min="5"
+          max="40"
+          step="1"
+          aria-label="Average speed on the flat in km/h"
+        />
+        km/h on the flat
+      </label>
       <BreakdownBar :items="wayTypes" label="Way types along the route" />
       <BreakdownBar :items="surfaces" label="Surfaces along the route" />
       <WarningList
@@ -90,6 +102,19 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 4px;
+}
+.speed {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.speed input {
+  width: 58px;
+  padding: 2px 6px;
 }
 .actions {
   margin-top: 14px;
