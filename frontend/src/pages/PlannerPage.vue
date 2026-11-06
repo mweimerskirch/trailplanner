@@ -10,7 +10,16 @@ import PlannerLayout from '@/components/templates/PlannerLayout.vue'
 import PlaceSearch from '@/components/molecules/PlaceSearch.vue'
 import PreferencesPanel from '@/components/organisms/PreferencesPanel.vue'
 import RouteStats from '@/components/organisms/RouteStats.vue'
-import { openRoute, profile, routeId, setStatus, status, viewOnly, waypoints } from '@/planner'
+import {
+  hoverIndex,
+  openRoute,
+  profile,
+  routeId,
+  setStatus,
+  status,
+  viewOnly,
+  waypoints,
+} from '@/planner'
 
 // ---------- URL <-> open route ----------
 // The address shows the open route (/routes/<id>), or '/' for a new one, so it can be bookmarked,
@@ -53,6 +62,9 @@ const hint = computed(() => {
   if (waypoints.value.length === 1) return 'Now click where you want to go'
   return ''
 })
+
+/** The point hovered on the chart or map (shared with MapView through the planner). */
+const hover = hoverIndex
 </script>
 
 <template>
@@ -71,12 +83,30 @@ const hint = computed(() => {
       <MapView />
       <StatusMessage :message="status" floating />
       <div v-if="hint" class="hint">{{ hint }}</div>
-      <ElevationChart v-if="profile.length > 1" />
+      <ElevationChart
+        v-if="profile.length > 1"
+        v-model:hover-index="hover"
+        :points="profile"
+        class="elevation"
+      />
     </template>
   </PlannerLayout>
 </template>
 
 <style scoped>
+.elevation {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 28px;
+  z-index: 2;
+  box-shadow: var(--shadow);
+}
+@media (max-width: 820px) {
+  .elevation {
+    height: 100px;
+  }
+}
 .credits {
   margin-top: 28px;
   color: var(--muted);

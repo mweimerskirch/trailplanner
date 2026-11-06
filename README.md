@@ -8,6 +8,8 @@ ELEMNT BOLT.
   maximum trail difficulty (`mtb:scale`) and can prefer riding through woods.
 - Shows distance, climbing, estimated time, an elevation profile and a way-type/surface breakdown.
 - Saves routes in a library (SQLite) and exports GPX for the BOLT.
+- Imports the rides the BOLT recorded (Rides): distance, moving time, climbing, speed, heart rate
+  and the track on a map; a ride can be saved to the library as a route.
 
 ```
 browser ──► web (nginx + Vue/MapLibre) ──/api──► backend (Spring Boot, SQLite)
@@ -40,7 +42,7 @@ To cover other areas, pass tile names: `./scripts/download-segments.sh E5_N45 E1
 5×5 degrees; `E5_N45` is 5–10° east, 45–50° north.
 
 **Riders.** On first start you add riders (just names). Each rider has their own library, trash,
-imports, Wahoo connection and planner state; the chosen rider is remembered per browser.
+imports, presets and planner state; the chosen rider is remembered per browser.
 
 > **No login.** Riders have no passwords and Trailplan has no authentication: everyone who can reach
 > it can open every rider's library. Run it on your own machine or
@@ -48,8 +50,26 @@ imports, Wahoo connection and planner state; the chosen rider is remembered per 
 
 ## Getting routes onto the BOLT
 
-**USB (recommended for the BOLT V2).** Switch the BOLT on, connect it with a USB data cable and copy
-the downloaded GPX into the device's `routes` folder:
+**Sync over USB (recommended).** Switch the BOLT on, connect it with a USB data cable to the computer
+that runs Trailplan, and choose **Sync to ELEMNT** in the library. The BOLT's `routes` folder then
+holds exactly your active routes (not archived, not in the trash) as GPX files: new and changed
+routes are copied, unchanged ones are skipped. Files in the folder that are not active routes (for
+example archived routes, or files from other apps) are listed and deleted only if you confirm. The
+BOLT keeps routes it has already loaded when their file is deleted, so delete those on the BOLT too.
+Changed routes replace the BOLT's copy (same file name).
+
+- The BOLT must not be open in a file manager at the same time (eject it there first): only one
+  program can talk to it.
+- In Docker the backend gets the USB bus (`/dev/bus/usb`, see `docker-compose.yml`) and runs as uid
+  1000. Desktop Linux gives the logged-in user access to MTP devices; if your user is not uid 1000,
+  or on a headless server, add a udev rule that makes the device accessible, e.g.
+  `SUBSYSTEM=="usb", ATTR{idVendor}=="05c6", ATTR{idProduct}=="9039", MODE="0666"` (the BOLT V2;
+  check yours with `lsusb`) in `/etc/udev/rules.d/70-elemnt.rules`.
+- The USB part is a small C helper on libmtp (`backend/mtp/trailplan-mtp.c`), built into the backend
+  image. To run the backend outside Docker, build it with `libmtp-dev` installed:
+  `gcc -O2 -o ~/.local/bin/trailplan-mtp backend/mtp/trailplan-mtp.c $(pkg-config --cflags --libs libmtp)`.
+
+**Copy by hand.** Copy a downloaded GPX into the device's `routes` folder:
 
 - Windows: the BOLT appears under “This PC”.
 - macOS: needs an MTP app such as OpenMTP.
@@ -61,12 +81,16 @@ On the BOLT, open the map page, choose ROUTE and press SYNC if the new route isn
 **ELEMNT app.** Open the GPX on your phone (or use “Share GPX” in the planner on a phone) and choose
 the ELEMNT app; it syncs the route to the BOLT.
 
-**Wahoo Cloud API (optional, off by default).** Sends routes straight to your Wahoo account as FIT
-course files. Needs an app registered at <https://developers.wahooligan.com> (with Wahoo's approval
-process) and the redirect URI `<TRAILPLAN_PUBLIC_URL>/api/wahoo/callback`. Set `WAHOO_ENABLED=true`,
-`WAHOO_CLIENT_ID` and `WAHOO_CLIENT_SECRET` in `.env`. Note: a Wahoo API reference states that
-API-created routes reach the newer Wahoo app and head units but not the legacy ELEMNT app, which the
-BOLT V2 may still use. Test with your device before relying on it.
+## Importing recorded rides
+
+The BOLT keeps every recorded ride as a FIT file in its `exports` folder. On the **Rides** page,
+**Import from ELEMNT** (BOLT connected over USB, as for the sync) imports the rides that are not in
+Trailplan yet. Files are recognised by name and size, so later imports only download new rides.
+Recordings without a GPS track (e.g. started by accident) are skipped. **Import FIT files…** takes
+FIT files from other devices or apps.
+
+Times are shown in the local time where the ride was recorded. Deleting a ride in Trailplan does not
+touch the device, and importing from the device does not bring it back; uploading its FIT file does.
 
 ## Development
 
@@ -135,7 +159,7 @@ moving one point recalculates only its two legs.
   temporary SQLite database, and the formatting check) passes on Java 25 with Spring Boot 4.1.
 
 Not yet tested: the frontend in a real browser, the Docker images, the end-to-end checks above
-against BRouter 1.7.10 (the version the image now uses), and the Wahoo API against a real account.
+against BRouter 1.7.10 (the version the image now uses).
 
 ## Credits
 

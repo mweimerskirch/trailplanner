@@ -8,9 +8,11 @@ import IconButton from '@/components/atoms/IconButton.vue'
 import SortableHeader from '@/components/molecules/SortableHeader.vue'
 import StatusMessage from '@/components/molecules/StatusMessage.vue'
 import TabBar from '@/components/molecules/TabBar.vue'
+import DeviceSyncButton from '@/components/organisms/DeviceSyncButton.vue'
 import ImportDialog from '@/components/organisms/ImportDialog.vue'
 import PageLayout from '@/components/templates/PageLayout.vue'
 import { askConfirm } from '@/confirm'
+import { saveFile } from '@/files'
 import * as planner from '@/planner'
 import type { RouteSource, RouteSummary } from '@/types'
 
@@ -19,6 +21,7 @@ const SOURCE_LABELS: Record<RouteSource, string> = {
   GPX: 'GPX file',
   FIT: 'FIT file',
   KOMOOT: 'Komoot',
+  RIDE: 'Ride',
 }
 
 type SortKey = 'updated' | 'name' | 'distance' | 'ascent' | 'source' | 'archived'
@@ -190,17 +193,7 @@ const duplicate = (route: RouteSummary) =>
 
 const download = (route: RouteSummary) =>
   act(async () => {
-    const file = await api.exportSaved(route.id, 'gpx')
-    const url = URL.createObjectURL(file)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = file.name // the server's name for it (Content-Disposition)
-    document.body.append(link)
-    link.click()
-    link.remove()
-    setTimeout(() => {
-      URL.revokeObjectURL(url)
-    }, 2000)
+    saveFile(await api.exportSaved(route.id, 'gpx'))
   }, 'Could not download the route.')
 
 const toggleFavorite = (route: RouteSummary) =>
@@ -313,7 +306,10 @@ watch(planner.libraryVersion, load)
         :model-value="tab"
         @update:model-value="setTab($event as Tab)"
       />
-      <button type="button" class="primary" @click="void importDialog?.open()">Import routes…</button>
+      <div class="actions">
+        <DeviceSyncButton />
+        <button type="button" class="primary" @click="void importDialog?.open()">Import routes…</button>
+      </div>
     </div>
 
     <StatusMessage :message="planner.status.value" />
@@ -549,7 +545,9 @@ watch(planner.libraryVersion, load)
   margin: 4px 0 14px;
   border-bottom: 1px solid var(--line);
 }
-.toolbar .primary {
+.toolbar .actions {
+  display: flex;
+  gap: 8px;
   margin-bottom: 8px;
 }
 .filters {

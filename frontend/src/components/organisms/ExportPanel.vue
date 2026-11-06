@@ -2,8 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import { api, ApiError } from '@/api'
 import StarToggle from '@/components/atoms/StarToggle.vue'
+import { saveFile } from '@/files'
 import * as planner from '@/planner'
-import { currentRider } from '@/session'
 import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
 
 const DEVICE_KEY = 'trailplan.device'
@@ -19,10 +19,6 @@ const ready = computed(() => !busy.value && planner.routeComplete.value)
 
 watch(deviceId, (id) => {
   localStorage.setItem(DEVICE_KEY, id)
-})
-// Cloud connections belong to the rider: reload when another rider is chosen.
-watch(currentRider, () => {
-  void loadDevices()
 })
 
 async function run(task: () => Promise<void>) {
@@ -74,17 +70,7 @@ async function file(format: FormatInfo, original = false): Promise<File> {
 
 const download = (format: FormatInfo, original = false) =>
   run(async () => {
-    const f = await file(format, original)
-    const url = URL.createObjectURL(f)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = f.name
-    document.body.append(link)
-    link.click()
-    link.remove()
-    setTimeout(() => {
-      URL.revokeObjectURL(url)
-    }, 2000)
+    saveFile(await file(format, original))
   })
 
 const share = (format: FormatInfo) =>
@@ -96,29 +82,6 @@ const share = (format: FormatInfo) =>
       if (error instanceof DOMException && error.name === 'AbortError') return
       throw error
     }
-  })
-
-const sendToCloud = () =>
-  run(async () => {
-    const target = device.value
-    if (!target?.cloud) return
-    const saved = planner.viewOnly.value && planner.routeId.value !== null ? null : await saveDraft()
-    const id = saved?.id ?? planner.routeId.value
-    if (id === null) return
-    await api.sendToCloud(target.id, id)
-    planner.setStatus(
-      `Sent to your ${target.cloud.serviceName} account. Sync the device to load it.`,
-      'info',
-      4000,
-    )
-  })
-
-const disconnect = () =>
-  run(async () => {
-    const target = device.value
-    if (!target) return
-    await api.disconnectCloud(target.id)
-    await loadDevices()
   })
 
 async function loadDevices() {
@@ -207,17 +170,7 @@ onMounted(async () => {
         >
           Share {{ device.formats[0].label }}
         </button>
-        <template v-if="device.cloud?.enabled">
-          <button v-if="device.cloud.connected" type="button" :disabled="!ready" @click="sendToCloud">
-            Send to {{ device.cloud.serviceName }}
-          </button>
-          <a v-else class="button" :href="device.cloud.connectPath">Connect {{ device.cloud.serviceName }}</a>
-        </template>
       </div>
-      <p v-if="device.cloud?.enabled && device.cloud.connected" class="small">
-        {{ device.cloud.serviceName }} connected.
-        <button type="button" class="link" @click="disconnect">Disconnect</button>
-      </p>
 
       <details v-for="method in device.transferMethods" :key="method.title">
         <summary>{{ method.title }}</summary>
@@ -241,10 +194,6 @@ onMounted(async () => {
 }
 .device {
   margin-top: 12px;
-}
-.small {
-  font-size: 13.5px;
-  color: var(--muted);
 }
 details {
   margin-top: 12px;

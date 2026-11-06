@@ -10,9 +10,11 @@ import { currentRider } from '@/session'
 const route = useRoute()
 /** "Planner" goes back to the open route, if any, not to an empty planner. */
 const plannerLink = computed(() => (routeId.value === null ? '/' : `/routes/${String(routeId.value)}`))
-const section = computed(() =>
-  route.name === 'library' ? 'library' : route.name === 'riders' ? 'riders' : 'planner',
-)
+const section = computed(() => {
+  if (route.name === 'library' || route.name === 'riders') return route.name
+  if (route.name === 'rides' || route.name === 'ride') return 'rides'
+  return 'planner'
+})
 </script>
 
 <template>
@@ -26,6 +28,7 @@ const section = computed(() =>
       <nav class="main" aria-label="Main">
         <RouterLink to="/library" :class="{ current: section === 'library' }">Library</RouterLink>
         <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">Planner</RouterLink>
+        <RouterLink to="/rides" :class="{ current: section === 'rides' }">Rides</RouterLink>
       </nav>
       <RiderMenu :rider="currentRider" class="menu" />
     </template>

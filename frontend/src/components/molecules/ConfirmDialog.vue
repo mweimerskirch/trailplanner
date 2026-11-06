@@ -38,8 +38,13 @@ function onClose() {
     <div v-if="pendingConfirm" class="box">
       <h2 id="confirm-title">{{ pendingConfirm.title }}</h2>
       <p id="confirm-message">{{ pendingConfirm.message }}</p>
+      <ul v-if="pendingConfirm.details?.length" class="details">
+        <li v-for="item in pendingConfirm.details" :key="item">{{ item }}</li>
+      </ul>
       <div class="buttons">
-        <button ref="cancelButton" type="button" @click="answerConfirm(false)">Cancel</button>
+        <button ref="cancelButton" type="button" @click="answerConfirm(false)">
+          {{ pendingConfirm.cancelLabel ?? 'Cancel' }}
+        </button>
         <button
           type="button"
           :class="pendingConfirm.danger ? 'danger' : 'primary'"
@@ -53,6 +58,14 @@ function onClose() {
 </template>
 
 <style scoped>
+.details {
+  max-height: 40vh;
+  overflow-y: auto;
+  margin: 0 0 12px;
+  padding-left: 20px;
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
 .confirm {
   width: min(420px, 92vw);
   padding: 0;

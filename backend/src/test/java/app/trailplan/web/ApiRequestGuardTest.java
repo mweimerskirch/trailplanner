@@ -18,13 +18,8 @@ class ApiRequestGuardTest {
           new TrailplanProperties(
               new TrailplanProperties.Router(
                   URI.create("http://brouter"), null, Duration.ofSeconds(1), 10),
-              new TrailplanProperties.Wahoo(
-                  false,
-                  URI.create("https://api.wahooligan.com"),
-                  "",
-                  "",
-                  URI.create("http://nas.local:8080")),
               new TrailplanProperties.Komoot(URI.create("https://api.komoot.de")),
+              new TrailplanProperties.Usb("trailplan-mtp", Duration.ofSeconds(1)),
               List.of("trailplan.home")));
 
   /** 200 if the request was let through, else the status the guard answered with. */
@@ -45,7 +40,6 @@ class ApiRequestGuardTest {
     assertThat(status("GET", "192.168.1.20:8080", false)).isEqualTo(200);
     assertThat(status("GET", "[::1]:8080", false)).isEqualTo(200);
     assertThat(status("GET", "localhost:5173", false)).isEqualTo(200);
-    assertThat(status("GET", "nas.local:8080", false)).isEqualTo(200); // public URL's host
     assertThat(status("GET", "Trailplan.Home", false)).isEqualTo(200); // allowed-hosts
   }
 

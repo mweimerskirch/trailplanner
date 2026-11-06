@@ -48,9 +48,7 @@ public class ExportController {
       return file(
           formats.get(format), new ExportedRoute(route.name(), o.track(), o.ascent(), o.descent()));
     }
-    return file(
-        formats.get(format),
-        new ExportedRoute(route.name(), route.track(), route.ascent(), route.descent()));
+    return file(formats.get(format), ExportedRoute.of(route));
   }
 
   /** The route currently in the planner, saved or not; the track is recalculated. */

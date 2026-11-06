@@ -4,8 +4,12 @@ import { shallowRef } from 'vue'
 export interface ConfirmRequest {
   title: string
   message: string
+  /** Shown as a list below the message, e.g. the files that would be deleted. */
+  details?: string[]
   /** Label of the confirming button, e.g. "Move to trash". */
   confirmLabel: string
+  /** Label of the other button; "Cancel" by default. */
+  cancelLabel?: string
   /** Red confirming button, for actions that delete. */
   danger?: boolean
 }

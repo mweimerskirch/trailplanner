@@ -19,8 +19,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
  *
  * <ul>
  *   <li><b>DNS rebinding</b>: a page on another domain can make its domain point to this server.
- *       Requests then carry that domain as Host, so only IP addresses, {@code localhost}, the
- *       public URL's host and {@code trailplan.allowed-hosts} are accepted.
+ *       Requests then carry that domain as Host, so only IP addresses, {@code localhost} and {@code
+ *       trailplan.allowed-hosts} are accepted.
  *   <li><b>Cross-site requests</b>: state-changing requests must carry {@value #CLIENT_HEADER}. A
  *       page on another origin cannot add custom headers without a CORS preflight, which fails.
  * </ul>
@@ -37,10 +37,6 @@ public class ApiRequestGuard extends OncePerRequestFilter {
 
   public ApiRequestGuard(TrailplanProperties props) {
     allowedHosts.add("localhost");
-    String publicHost = props.wahoo().publicUrl().getHost();
-    if (publicHost != null) {
-      allowedHosts.add(publicHost.toLowerCase(Locale.ROOT));
-    }
     for (String host : props.allowedHosts()) {
       if (!host.isBlank()) {
         allowedHosts.add(host.strip().toLowerCase(Locale.ROOT));

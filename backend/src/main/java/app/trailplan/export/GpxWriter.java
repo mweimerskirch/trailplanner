@@ -30,6 +30,7 @@ public final class GpxWriter {
     return gpx.toString();
   }
 
+  /** Escapes element text. Quotes need no escaping there, and some devices show {@code &quot;}. */
   static String escape(String text) {
     StringBuilder out = new StringBuilder(text.length());
     for (char c : text.toCharArray()) {
@@ -37,8 +38,6 @@ public final class GpxWriter {
         case '<' -> out.append("&lt;");
         case '>' -> out.append("&gt;");
         case '&' -> out.append("&amp;");
-        case '"' -> out.append("&quot;");
-        case '\'' -> out.append("&apos;");
         default -> {
           if (c >= 0x20 || c == '\t' || c == '\n' || c == '\r') {
             out.append(c);

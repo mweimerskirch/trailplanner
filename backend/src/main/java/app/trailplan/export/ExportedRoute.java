@@ -1,5 +1,6 @@
 package app.trailplan.export;
 
+import app.trailplan.routes.StoredRoute;
 import app.trailplan.routing.TrackPoint;
 import java.util.List;
 
@@ -8,5 +9,10 @@ public record ExportedRoute(String name, List<TrackPoint> track, double ascent, 
 
   public ExportedRoute {
     track = List.copyOf(track);
+  }
+
+  /** A saved route with its stored track. */
+  public static ExportedRoute of(StoredRoute route) {
+    return new ExportedRoute(route.name(), route.track(), route.ascent(), route.descent());
   }
 }

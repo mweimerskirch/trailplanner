@@ -30,7 +30,7 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   any other exception is an internal error (500).
 - Riders: there are no passwords. The chosen rider is a cookie, resolved into a `CurrentUser`
   controller parameter (401 with reason `NO_USER` if missing). Every route query must be scoped
-  to the rider (`RouteRepository` methods take `userId`); cloud connections are per rider too.
+  to the rider (`RouteRepository` methods take `userId`).
 - Riding-style presets are per rider. The built-in ones are defined only in
   `presets.DefaultPresets`; riders get them once (`rider.presets_seeded`).
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
@@ -41,7 +41,8 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 Vue components follow atomic design, one folder per level in `frontend/src/components/`:
 `atoms/` (AppLogo, Avatar, Badge, IconButton, StarToggle), `molecules/` (TabBar, StatusMessage,
 StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog), `organisms/` (AppHeader, MapView,
-ElevationChart, RouteStats, ExportPanel, ImportDialog, PreferencesPanel) and
+ElevationChart, RouteStats, ExportPanel, ImportDialog, PreferencesPanel, DeviceSyncButton,
+RideImportButton, TrackMap) and
 `templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.
 A component may only use components from its own level or below. Ask for confirmation with
 `askConfirm()` from `confirm.ts` (shown by the one ConfirmDialog in App.vue), not `confirm()`. Shared state is in `planner.ts`,
@@ -51,9 +52,17 @@ A component may only use components from its own level or below. Ask for confirm
 
 - Devices: implement `devices.DeviceIntegration` as a Spring bean (`@Order` sets its position).
   It declares export formats, transfer instructions, import instructions and an optional
-  `CloudSync`. The UI builds the export panel from `GET /api/devices`, so a new device needs no
-  frontend change. Cloud links are stored generically in `route_cloud_link` (see
-  `CloudLinkRepository`); a cloud integration needs no columns of its own.
+  `UsbSync` (label, device match, folder, format). The UI builds the export panel and the
+  library's sync button from `GET /api/devices`, so a new device needs no frontend change.
+- USB sync: `DeviceSyncService` mirrors the rider's active routes into the device folder and
+  deletes other files only when the rider confirms them by name. Device access goes through
+  `MtpDevice`; the real one (`LibmtpHelper`) runs the C helper `backend/mtp/trailplan-mtp.c`
+  (libmtp), which is built in the backend Dockerfile. Tests use a fake `MtpDevice`. Device
+  tasks run one at a time through `DeviceLock`.
+- Rides: `rides.RideService` imports FIT activity files (uploaded, or from `UsbSync.ridesFolder`
+  over USB). The FIT file is stored in the `ride` table and the track is read from it on demand
+  (`RideFileReader`, on top of `imports.FitReader.decode`). Deleted rides keep their row so a device
+  import skips them.
 - Export formats: implement `export.RouteFormat` as a Spring bean. It is served at
   `/api/routes/{id}/export/{format}` and `/api/export/{format}`.
 - Database: Flyway applies the SQL files in `backend/src/main/resources/db/migration` on startup.

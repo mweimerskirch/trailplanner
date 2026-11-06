@@ -234,9 +234,8 @@ public class RouteRepository {
   }
 
   /**
-   * Copies a route under a new name, including the original of an import. The copy has no cloud
-   * links (they live in their own table) and no import id, so re-sending or re-importing never
-   * confuses it with the original.
+   * Copies a route under a new name, including the original of an import. The copy has no import
+   * id, so re-importing never confuses it with the original.
    *
    * @return the id of the copy, or empty if the original does not exist
    */

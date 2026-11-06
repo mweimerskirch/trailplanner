@@ -1,9 +1,12 @@
 package app.trailplan;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 /** Minimal HTTP helper for tests that run the whole application on a random port. */
 public final class TestHttp {
@@ -41,6 +44,33 @@ public final class TestHttp {
       request
           .header("Content-Type", "application/json")
           .method(method, HttpRequest.BodyPublishers.ofString(jsonBody));
+    }
+    return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
+  }
+
+  /** Uploads files as the form field {@code files}, as a browser would. */
+  public HttpResponse<String> upload(String path, Map<String, byte[]> files) throws Exception {
+    String boundary = "----trailplan-test";
+    ByteArrayOutputStream body = new ByteArrayOutputStream();
+    for (Map.Entry<String, byte[]> file : files.entrySet()) {
+      body.writeBytes(
+          ("--"
+                  + boundary
+                  + "\r\nContent-Disposition: form-data; name=\"files\"; filename=\""
+                  + file.getKey()
+                  + "\"\r\nContent-Type: application/octet-stream\r\n\r\n")
+              .getBytes(StandardCharsets.UTF_8));
+      body.writeBytes(file.getValue());
+      body.writeBytes("\r\n".getBytes(StandardCharsets.UTF_8));
+    }
+    body.writeBytes(("--" + boundary + "--\r\n").getBytes(StandardCharsets.UTF_8));
+    HttpRequest.Builder request =
+        HttpRequest.newBuilder(URI.create("http://localhost:" + port + path))
+            .header("X-Trailplan-Client", "web")
+            .header("Content-Type", "multipart/form-data; boundary=" + boundary)
+            .POST(HttpRequest.BodyPublishers.ofByteArray(body.toByteArray()));
+    if (rider != null) {
+      request.header("X-Trailplan-Rider", rider);
     }
     return http.send(request.build(), HttpResponse.BodyHandlers.ofString());
   }

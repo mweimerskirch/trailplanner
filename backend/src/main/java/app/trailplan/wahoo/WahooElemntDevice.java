@@ -1,8 +1,8 @@
 package app.trailplan.wahoo;
 
-import app.trailplan.devices.CloudSync;
 import app.trailplan.devices.DeviceIntegration;
 import app.trailplan.devices.TransferMethod;
+import app.trailplan.devices.UsbSync;
 import java.util.List;
 import java.util.Optional;
 import org.springframework.core.annotation.Order;
@@ -12,12 +12,6 @@ import org.springframework.stereotype.Component;
 @Component
 @Order(10)
 public class WahooElemntDevice implements DeviceIntegration {
-
-  private final WahooCloudSync cloud;
-
-  public WahooElemntDevice(WahooCloudSync cloud) {
-    this.cloud = cloud;
-  }
 
   @Override
   public String id() {
@@ -40,10 +34,12 @@ public class WahooElemntDevice implements DeviceIntegration {
         new TransferMethod(
             "Copy over USB",
             List.of(
-                "Switch the ELEMNT on and connect it with a USB data cable.",
-                "Copy the GPX into the device's routes folder. Windows: it appears under “This"
-                    + " PC”. macOS: use an MTP app such as OpenMTP. Linux: your file manager,"
-                    + " or scripts/copy-to-bolt.sh.",
+                "Switch the ELEMNT on and connect it with a USB data cable to the computer that"
+                    + " runs Trailplan, then choose “Sync to ELEMNT” in the library: it copies all"
+                    + " your active routes.",
+                "Or copy this GPX into the device's routes folder yourself. Windows: it appears"
+                    + " under “This PC”. macOS: use an MTP app such as OpenMTP. Linux: your file"
+                    + " manager, or scripts/copy-to-bolt.sh.",
                 "On the ELEMNT, open the map page, choose ROUTE, and press SYNC if the route"
                     + " isn't listed.")),
         new TransferMethod(
@@ -61,7 +57,17 @@ public class WahooElemntDevice implements DeviceIntegration {
   }
 
   @Override
-  public Optional<CloudSync> cloudSync() {
-    return Optional.of(cloud);
+  public Optional<UsbSync> usbSync() {
+    return Optional.of(
+        new UsbSync(
+            "ELEMNT",
+            "Wahoo",
+            "routes",
+            "gpx",
+            "On the ELEMNT, open the map page and choose ROUTE. Press SYNC if a route is missing.",
+            true, // the ELEMNT drops accented letters and shows XML escapes literally
+            // Tested on a BOLT V2: it keeps routes it has loaded when their file is deleted.
+            "The ELEMNT keeps routes it has already loaded: delete them on the device too.",
+            "exports")); // recorded rides as FIT files
   }
 }

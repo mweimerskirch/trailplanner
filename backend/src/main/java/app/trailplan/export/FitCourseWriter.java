@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * Writes a route as a FIT course file, the format Wahoo's Cloud API expects for routes.
+ * Writes a route as a FIT course file, which Garmin and Wahoo devices take as a course.
  *
  * <p>Implements just the slice of the FIT protocol a course needs (file_id, course, lap, timer
  * events and records), so no SDK dependency is required. Timestamps are synthetic, based on a
@@ -17,7 +17,7 @@ public final class FitCourseWriter {
 
   private static final long FIT_EPOCH_OFFSET = 631_065_600L; // 1989-12-31T00:00:00Z
   private static final double NOMINAL_SPEED_MPS = 15 / 3.6;
-  private static final int MAX_NAME_BYTES = 32;
+  private static final int MAX_NAME_BYTES = 64;
 
   // FIT base types
   private static final int ENUM = 0x00;

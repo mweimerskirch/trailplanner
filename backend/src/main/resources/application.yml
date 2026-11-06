@@ -1,6 +1,6 @@
 server:
   port: 8081
-  # Behind nginx in Docker; trust X-Forwarded-* so redirects use the public host.
+  # Behind nginx in Docker; trust X-Forwarded-* for the client's host and scheme.
   forward-headers-strategy: framework
 
 spring:
@@ -21,19 +21,13 @@ spring:
     default-property-inclusion: always
 
 trailplan:
-  # Host names under which the API may be used, besides IP addresses, localhost and the public
-  # URL's host (protection against DNS rebinding). Comma-separated, e.g. "trailplan.home".
+  # Host names under which the API may be used, besides IP addresses and localhost (protection against DNS rebinding). Comma-separated, e.g. "trailplan.home".
   allowed-hosts: ${TRAILPLAN_ALLOWED_HOSTS:}
   router:
     base-url: ${BROUTER_URL:http://localhost:17777}
     custom-profile-dir: ${BROUTER_CUSTOM_PROFILE_DIR:../data/customprofiles}
     timeout: PT60S
     leg-cache-size: 2000
-  wahoo:
-    enabled: ${WAHOO_ENABLED:false}
-    client-id: ${WAHOO_CLIENT_ID:}
-    client-secret: ${WAHOO_CLIENT_SECRET:}
-    public-url: ${TRAILPLAN_PUBLIC_URL:http://localhost:5173}
 
 management:
   endpoints.web.exposure.include: health

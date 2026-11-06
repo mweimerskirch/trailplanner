@@ -1,13 +1,22 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue'
-import { hoverIndex, profile } from '@/planner'
+import type { ProfilePoint } from '@/profile'
+
+/**
+ * Elevation over distance. Pointing at the chart sets the hovered point (v-model:hover-index), so
+ * the map can mark it; a point hovered elsewhere is marked here.
+ */
+const props = withDefaults(defineProps<{ points: ProfilePoint[]; label?: string }>(), {
+  label: 'Elevation profile of the route',
+})
+const hoverIndex = defineModel<number | null>('hoverIndex', { default: null })
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
 const PAD = { left: 46, right: 12, top: 22, bottom: 20 }
 let resizeObserver: ResizeObserver | null = null
 
 const tooltip = computed(() => {
-  const p = hoverIndex.value === null ? undefined : profile.value[hoverIndex.value]
+  const p = hoverIndex.value === null ? undefined : props.points[hoverIndex.value]
   if (!p) return ''
   return `${(p.distance / 1000).toFixed(2)} km · ${p.ele === null ? '–' : `${Math.round(p.ele)} m`}`
 })
@@ -18,7 +27,7 @@ function cssVar(name: string) {
 
 function draw() {
   const el = canvas.value
-  const points = profile.value
+  const points = props.points
   if (!el || points.length < 2) return
   const { width, height } = el.getBoundingClientRect()
   if (width === 0) return
@@ -97,7 +106,7 @@ function draw() {
 
 function onPointerMove(event: PointerEvent) {
   const el = canvas.value
-  const points = profile.value
+  const points = props.points
   if (!el || points.length < 2) return
   const rect = el.getBoundingClientRect()
   const total = points.at(-1)?.distance ?? 0
@@ -117,7 +126,7 @@ function onPointerLeave() {
   hoverIndex.value = null
 }
 
-watch([profile, hoverIndex], draw)
+watch([() => props.points, hoverIndex], draw)
 onMounted(() => {
   if (canvas.value) {
     resizeObserver = new ResizeObserver(draw)
@@ -128,7 +137,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
-  <div class="elevation" role="img" aria-label="Elevation profile of the route">
+  <div class="elevation" role="img" :aria-label="label">
     <canvas ref="canvas" @pointermove="onPointerMove" @pointerleave="onPointerLeave" />
     <div class="tip">{{ tooltip }}</div>
   </div>
@@ -136,16 +145,11 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 
 <style scoped>
 .elevation {
-  position: absolute;
-  left: 12px;
-  right: 12px;
-  bottom: 28px;
+  position: relative;
   height: 130px;
-  z-index: 2;
   background: var(--panel);
   border: 1px solid var(--line);
   border-radius: 10px;
-  box-shadow: var(--shadow);
 }
 canvas {
   display: block;
@@ -162,10 +166,5 @@ canvas {
   color: var(--muted);
   font-variant-numeric: tabular-nums;
   pointer-events: none;
-}
-@media (max-width: 820px) {
-  .elevation {
-    height: 100px;
-  }
 }
 </style>

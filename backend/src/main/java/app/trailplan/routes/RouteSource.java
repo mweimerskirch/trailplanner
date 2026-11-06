@@ -5,5 +5,7 @@ public enum RouteSource {
   PLANNER,
   GPX,
   FIT,
-  KOMOOT
+  KOMOOT,
+  /** The track of a recorded ride (see rides.RideService#saveAsRoute). */
+  RIDE
 }

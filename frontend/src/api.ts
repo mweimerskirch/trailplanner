@@ -1,5 +1,4 @@
 import type {
-  CloudSyncResult,
   ConversionResult,
   LegType,
   DeviceInfo,
@@ -8,6 +7,10 @@ import type {
   KomootStatus,
   KomootTour,
   Preset,
+  DeviceImportResult,
+  RideDetails,
+  RideImportResult,
+  RideSummary,
   Rider,
   RiderSummary,
   RouteDetails,
@@ -15,6 +18,8 @@ import type {
   RouteLeg,
   RouteSummary,
   RoutingPreferences,
+  SyncPlan,
+  SyncResult,
 } from './types'
 
 export class ApiError extends Error {
@@ -213,18 +218,61 @@ export const api = {
     return json<DeviceInfo[]>('/api/devices')
   },
 
-  sendToCloud(deviceId: string, routeId: number) {
-    return json<CloudSyncResult>(`/api/devices/${deviceId}/cloud/routes/${routeId}`, { method: 'POST' })
+  /** What syncing the connected device would change; changes nothing. */
+  syncPlan(deviceId: string) {
+    return json<SyncPlan>(`/api/devices/${deviceId}/sync`)
   },
 
-  async disconnectCloud(deviceId: string) {
-    await send(`/api/devices/${deviceId}/cloud/connection`, { method: 'DELETE' })
+  /** Copies new and changed routes; deletes only the listed files that are not active routes. */
+  sync(deviceId: string, remove: string[]) {
+    return json<SyncResult>(`/api/devices/${deviceId}/sync`, {
+      method: 'POST',
+      body: JSON.stringify({ remove }),
+    })
   },
 
   importFiles(files: File[]) {
     const form = new FormData()
     for (const file of files) form.append('files', file)
     return json<ImportResult[]>('/api/import/files', { method: 'POST', body: form })
+  },
+
+  listRides() {
+    return json<RideSummary[]>('/api/rides')
+  },
+
+  getRide(id: number) {
+    return json<RideDetails>(`/api/rides/${id}`)
+  },
+
+  renameRide(id: number, name: string) {
+    return json<RideSummary>(`/api/rides/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
+  },
+
+  /** Deletes the ride; importing from the device does not bring it back. */
+  async deleteRide(id: number) {
+    await send(`/api/rides/${id}`, { method: 'DELETE' })
+  },
+
+  /** Adds the ride's track to the library as a route (once). */
+  saveRideAsRoute(id: number) {
+    return json<ImportResult>(`/api/rides/${id}/route`, { method: 'POST' })
+  },
+
+  /** The ride's FIT file as recorded. */
+  async rideFile(id: number): Promise<File> {
+    return toFile(await send(`/api/rides/${id}/file`, { headers: { Accept: '*/*' } }))
+  },
+
+  importRideFiles(files: File[]) {
+    const form = new FormData()
+    for (const file of files) form.append('files', file)
+    return json<RideImportResult[]>('/api/rides/files', { method: 'POST', body: form })
+  },
+
+  /** Imports the rides on the connected device that are not imported yet. */
+  importRidesFromDevice(deviceId: string) {
+    return json<DeviceImportResult>(`/api/rides/device/${deviceId}`, { method: 'POST' })
   },
 
   presets() {

@@ -65,7 +65,7 @@ public class UserRepository {
         == 1;
   }
 
-  /** Deletes the rider with all their routes and cloud connections (foreign keys cascade). */
+  /** Deletes the rider with all their routes and presets (foreign keys cascade). */
   public boolean delete(long id) {
     return jdbc.sql("DELETE FROM rider WHERE id = :id").param("id", id).update() == 1;
   }

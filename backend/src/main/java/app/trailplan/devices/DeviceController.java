@@ -2,41 +2,50 @@ package app.trailplan.devices;
 
 import app.trailplan.users.CurrentUser;
 import java.util.List;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/devices")
 public class DeviceController {
 
-  private final DeviceService devices;
-
-  public DeviceController(DeviceService devices) {
-    this.devices = devices;
+  /**
+   * @param remove files to delete from the device, as listed in the plan's {@code remove}
+   */
+  public record SyncRequest(List<String> remove) {
+    public SyncRequest {
+      remove = remove == null ? List.of() : List.copyOf(remove);
+    }
   }
 
-  /** All supported devices with their formats, instructions and cloud status. */
+  private final DeviceService devices;
+  private final DeviceSyncService sync;
+
+  public DeviceController(DeviceService devices, DeviceSyncService sync) {
+    this.devices = devices;
+    this.sync = sync;
+  }
+
+  /** All supported devices with their formats and instructions. */
   @GetMapping
   public List<DeviceService.DeviceInfo> list(CurrentUser user) {
-    return devices.devices(user);
+    return devices.devices();
   }
 
-  /** Sends a saved route to the device maker's cloud account. */
-  @PostMapping("/{deviceId}/cloud/routes/{routeId}")
-  public DeviceService.SyncResult send(
-      CurrentUser user, @PathVariable String deviceId, @PathVariable long routeId) {
-    return devices.send(user, deviceId, routeId);
+  /** What syncing the connected device would change; nothing is changed. */
+  @GetMapping("/{deviceId}/sync")
+  public DeviceSyncService.SyncPlan syncPlan(CurrentUser user, @PathVariable String deviceId) {
+    return sync.plan(user, deviceId);
   }
 
-  @DeleteMapping("/{deviceId}/cloud/connection")
-  @ResponseStatus(HttpStatus.NO_CONTENT)
-  public void disconnect(CurrentUser user, @PathVariable String deviceId) {
-    devices.disconnect(user, deviceId);
+  /** Copies the rider's active routes to the connected device; deletes only confirmed files. */
+  @PostMapping("/{deviceId}/sync")
+  public DeviceSyncService.SyncResult sync(
+      CurrentUser user, @PathVariable String deviceId, @RequestBody SyncRequest request) {
+    return sync.sync(user, deviceId, request.remove());
   }
 }

@@ -18,14 +18,16 @@ services:
       BROUTER_URL: http://brouter:17777
       BROUTER_CUSTOM_PROFILE_DIR: /customprofiles
       TRAILPLAN_DB: /data/trailplan.db
-      TRAILPLAN_PUBLIC_URL: ${TRAILPLAN_PUBLIC_URL:-http://localhost:8080}
       TRAILPLAN_ALLOWED_HOSTS: ${TRAILPLAN_ALLOWED_HOSTS:-}
-      WAHOO_ENABLED: ${WAHOO_ENABLED:-false}
-      WAHOO_CLIENT_ID: ${WAHOO_CLIENT_ID:-}
-      WAHOO_CLIENT_SECRET: ${WAHOO_CLIENT_SECRET:-}
     volumes:
       - ./data/db:/data
       - ./data/customprofiles:/customprofiles
+      # USB sync: the whole bus, so devices plugged in later are seen too. Access is limited to USB
+      # devices (major 189); the container user (uid 1000) needs permission on the device node,
+      # which desktop Linux grants to the logged-in user (see README).
+      - /dev/bus/usb:/dev/bus/usb
+    device_cgroup_rules:
+      - "c 189:* rmw"
     depends_on:
       - brouter
     restart: unless-stopped

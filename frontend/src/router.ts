@@ -3,6 +3,8 @@ import { onNoRider } from './api'
 import { currentRider, forgetRider, loadSession } from './session'
 import LibraryPage from './pages/LibraryPage.vue'
 import PlannerPage from './pages/PlannerPage.vue'
+import RidePage from './pages/RidePage.vue'
+import RidesPage from './pages/RidesPage.vue'
 import RidersPage from './pages/RidersPage.vue'
 
 export const router = createRouter({
@@ -14,6 +16,9 @@ export const router = createRouter({
     { path: '/routes/:id(\\d+)', name: 'route', component: PlannerPage },
     // The library: '/library', '/library/archived' or '/library/trash'.
     { path: '/library/:tab(archived|trash)?', name: 'library', component: LibraryPage },
+    // Recorded rides: '/rides', and one ride at '/rides/<id>'.
+    { path: '/rides', name: 'rides', component: RidesPage },
+    { path: '/rides/:id(\\d+)', name: 'ride', component: RidePage },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

@@ -6,7 +6,7 @@ import java.util.Optional;
 /**
  * A bike computer, watch or app that routes are sent to. Implementations are Spring beans and are
  * picked up automatically; the UI builds its export options from them, so supporting another device
- * means adding one class (plus a {@link CloudSync} if the maker offers a cloud API).
+ * means adding one class.
  *
  * <p>Annotate implementations with {@code @Order} to control their position in the device list.
  */
@@ -27,8 +27,8 @@ public interface DeviceIntegration {
   /** How to bring routes from the device into Trailplan with the file import, if possible. */
   Optional<String> importInstructions();
 
-  /** Direct upload to the maker's cloud account, if supported. */
-  default Optional<CloudSync> cloudSync() {
+  /** Syncing all active routes to the device over USB, if it is supported. */
+  default Optional<UsbSync> usbSync() {
     return Optional.empty();
   }
 }

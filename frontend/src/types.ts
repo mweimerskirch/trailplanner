@@ -63,7 +63,7 @@ export interface RouteDraft {
   expectedUpdatedAt?: string | null
 }
 
-export type RouteSource = 'PLANNER' | 'GPX' | 'FIT' | 'KOMOOT'
+export type RouteSource = 'PLANNER' | 'GPX' | 'FIT' | 'KOMOOT' | 'RIDE'
 
 export interface RouteSummary {
   id: number
@@ -115,13 +115,6 @@ export interface TransferMethod {
   steps: string[]
 }
 
-export interface CloudInfo {
-  serviceName: string
-  enabled: boolean
-  connected: boolean
-  connectPath: string
-}
-
 /** A device plugin as described by the backend (app.trailplan.devices). */
 export interface DeviceInfo {
   id: string
@@ -129,13 +122,97 @@ export interface DeviceInfo {
   formats: FormatInfo[]
   transferMethods: TransferMethod[]
   importInstructions: string | null
-  cloud: CloudInfo | null
+  /** Syncing all active routes over USB, if the device supports it. */
+  usbSync: UsbSyncInfo | null
 }
 
-export interface CloudSyncResult {
-  service: string
-  remoteId: string
-  syncedAt: string
+export interface UsbSyncInfo {
+  /** Short device name for buttons, e.g. "ELEMNT". */
+  label: string
+  folder: string
+  afterSync: string | null
+  /** What deleting a file does not do on the device, e.g. remove a route it already loaded. */
+  removalNote: string | null
+  /** Whether recorded rides can be imported from the device. */
+  importsRides: boolean
+}
+
+/**
+ * A recorded ride (mirrors rides.RideSummary). Durations in seconds, distances in metres, speeds
+ * in m/s; values the device did not record are null.
+ */
+export interface RideSummary {
+  id: number
+  name: string
+  /** e.g. "cycling", "running". */
+  sport: string | null
+  startedAt: string
+  /** Local time minus UTC at the ride, in seconds. */
+  utcOffset: number | null
+  elapsed: number
+  moving: number
+  distance: number
+  ascent: number
+  descent: number
+  /** Distance over moving time. */
+  avgSpeed: number | null
+  maxSpeed: number | null
+  avgHeartRate: number | null
+  maxHeartRate: number | null
+  avgPower: number | null
+  calories: number | null
+  fileName: string
+}
+
+export interface RideDetails {
+  ride: RideSummary
+  /** [lng, lat, ele] per recorded position. */
+  track: [number, number, number | null][]
+  /** The library route made from this ride, if any. */
+  routeId: number | null
+}
+
+export interface RideImportResult {
+  fileName: string
+  status: 'IMPORTED' | 'ALREADY_IMPORTED' | 'FAILED'
+  rideId: number | null
+  name: string | null
+  message: string | null
+}
+
+export interface DeviceImportResult {
+  device: string
+  imported: number
+  /** Files imported before (also of deleted rides). */
+  skipped: number
+  /** Recordings without GPS positions (e.g. started by accident), not imported. */
+  withoutTrack: number
+  failed: RideImportResult[]
+}
+
+/** A route file on the device; routeName is null for files that are not active routes. */
+export interface SyncFile {
+  fileName: string
+  routeName: string | null
+}
+
+/** What syncing would change (app.trailplan.devices.DeviceSyncService). */
+export interface SyncPlan {
+  /** The connected device's model, e.g. "ELEMNT-BOLT2". */
+  device: string
+  add: SyncFile[]
+  update: SyncFile[]
+  /** Files that are not active routes; deleted only if confirmed. */
+  remove: SyncFile[]
+  unchanged: number
+}
+
+export interface SyncResult {
+  device: string
+  added: number
+  updated: number
+  removed: number
+  unchanged: number
 }
 
 export interface ImportResult {

@@ -15,6 +15,7 @@ import type {
   WayCategory,
 } from './types'
 import { createHistory } from './history'
+import { haversine, type ProfilePoint } from './profile'
 import { inserted, legType, removed, reversed, withLegType } from './waypoints'
 
 /**
@@ -37,12 +38,7 @@ export interface FixedTrack {
 export type LegState =
   { status: 'loading' } | { status: 'ok'; leg: RouteLeg } | { status: 'error'; message: string }
 
-export interface ProfilePoint {
-  distance: number
-  ele: number | null
-  lng: number
-  lat: number
-}
+export type { ProfilePoint }
 
 export interface StatusMessage {
   text: string
@@ -430,7 +426,7 @@ const pointKey = (p: GeoPoint) => `${p.lat.toFixed(6)},${p.lng.toFixed(6)}`
 
 /** A straight leg needs no router; way type and elevation are unknown. */
 function straightLeg(from: GeoPoint, to: GeoPoint): RouteLeg {
-  const distance = haversine({ ...from, ele: null, distance: 0 }, { ...to, ele: null, distance: 0 })
+  const distance = haversine(from, to)
   return {
     points: [
       [from.lng, from.lat, null],
@@ -582,14 +578,6 @@ export const breakdown = computed<LegBreakdown>(() => {
   }
   return { wayTypes, surfaces, other }
 })
-
-function haversine(a: ProfilePoint, b: ProfilePoint): number {
-  const rad = Math.PI / 180
-  const dLat = (b.lat - a.lat) * rad
-  const dLng = (b.lng - a.lng) * rad
-  const s = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * rad) * Math.cos(b.lat * rad) * Math.sin(dLng / 2) ** 2
-  return 2 * 6_371_000 * Math.asin(Math.sqrt(s))
-}
 
 /** The calculated track as one list with cumulative distance, for the elevation chart. */
 export const profile = computed<ProfilePoint[]>(() => {
