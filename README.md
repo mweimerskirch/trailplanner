@@ -6,6 +6,10 @@ ELEMNT BOLT.
 - Click the map to set points, drag points to move them, drag the route line to add a via point.
 - Routing prefers the way types you choose (singletrails, forest tracks, roads …), respects a
   maximum trail difficulty (`mtb:scale`) and can prefer riding through woods.
+- "Trails" map overlay on any base map: paths and tracks from OpenStreetMap coloured by difficulty
+  (mtb:scale S0 green, S1 blue, S2 red, S3+ black), unrated ones dashed brown, ways closed to bikes
+  dotted grey. Trails harder than the riding style allows are faded. Pointing at a path or road
+  shows its name, type, difficulty, surface and bike access.
 - Shows distance, climbing, estimated time, an elevation profile and a way-type/surface breakdown.
 - Saves routes in a library (SQLite) and exports GPX for the BOLT.
 - Imports the rides the BOLT recorded (Rides): distance, moving time, climbing, speed, heart rate
@@ -165,5 +169,5 @@ against BRouter 1.7.10 (the version the image now uses).
 
 Map data © OpenStreetMap contributors (ODbL). Routing: [BRouter](https://github.com/abrensch/brouter)
 (MIT). Base map: [OpenFreeMap](https://openfreemap.org); raster maps: CyclOSM, OpenTopoMap, Esri World
-Imagery; MTB overlay: Waymarked Trails. Respect each tile provider's usage policy; for heavy use,
-host your own tiles.
+Imagery; MTB overlay: Waymarked Trails; trail overlay: drawn from the OpenFreeMap vector tiles.
+Respect each tile provider's usage policy; for heavy use, host your own tiles.

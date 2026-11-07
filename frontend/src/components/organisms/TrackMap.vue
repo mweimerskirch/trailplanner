@@ -5,10 +5,12 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import { onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue'
 import { addRasterLayers, type BaseMapId, showBaseMap, showMtbOverlay, VECTOR_STYLE_URL } from '@/map/layers'
+import { addTrailLayers, showTrails } from '@/map/trails'
+import { attachWayInfo } from '@/map/wayInfo'
 
 /**
  * A map that shows one fixed track (e.g. a recorded ride) with its start and end, on the base map
- * chosen in the planner. Nothing on it can be edited.
+ * chosen in the planner (with the trail overlay if it is on there). Nothing on it can be edited.
  */
 const props = defineProps<{
   track: [number, number, number | null][]
@@ -78,6 +80,10 @@ onMounted(() => {
     addRasterLayers(m)
     showBaseMap(m, (localStorage.getItem('trailplan.basemap') as BaseMapId | null) ?? 'cyclosm')
     showMtbOverlay(m, localStorage.getItem('trailplan.mtbOverlay') === 'true')
+    addTrailLayers(m)
+    const trails = localStorage.getItem('trailplan.trails') === 'true'
+    showTrails(m, trails)
+    if (trails) attachWayInfo(m, { enabled: () => true })
     m.addSource('track', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } })
     m.addLayer({
       id: 'track-casing',

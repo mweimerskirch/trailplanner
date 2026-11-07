@@ -40,7 +40,7 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 
 Vue components follow atomic design, one folder per level in `frontend/src/components/`:
 `atoms/` (AppLogo, Avatar, Badge, IconButton, StarToggle), `molecules/` (TabBar, StatusMessage,
-StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog), `organisms/` (AppHeader, MapView,
+StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog, TrailLegend), `organisms/` (AppHeader, MapView,
 ElevationChart, RouteStats, ExportPanel, ImportDialog, PreferencesPanel, DeviceSyncButton,
 RideImportButton, TrackMap) and
 `templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.
@@ -65,6 +65,10 @@ A component may only use components from its own level or below. Ask for confirm
   import skips them.
 - Export formats: implement `export.RouteFormat` as a Spring bean. It is served at
   `/api/routes/{id}/export/{format}` and `/api/export/{format}`.
+- Map layers: base maps and the raster overlay are in `map/layers.ts`; the trail overlay
+  (`map/trails.ts`) styles the `transportation` layer of the OpenFreeMap vector source
+  (OpenMapTiles schema: `class`, `subclass`, `mtb_scale`, `surface`, `access`, `bicycle`).
+  `map/wayInfo.ts` shows the hovered way's details (names come from `transportation_name`).
 - Database: Flyway applies the SQL files in `backend/src/main/resources/db/migration` on startup.
   For a schema change add a new `V<next>__description.sql`; never edit a released file (Flyway
   checks checksums and refuses to start). Store timestamps with `db.Timestamps`.

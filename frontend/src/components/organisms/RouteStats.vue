@@ -79,7 +79,9 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
       </div>
     </template>
     <div class="row actions">
-      <button type="button" :disabled="!planner.canUndo.value" @click="planner.undo">Undo</button>
+      <button type="button" :disabled="!planner.canUndo.value" title="Undo (Ctrl+Z)" @click="planner.undo">
+        Undo
+      </button>
       <template v-if="!planner.viewOnly.value">
         <button type="button" @click="planner.reverseRoute">Reverse</button>
         <button type="button" @click="planner.backToStart">Back to start</button>

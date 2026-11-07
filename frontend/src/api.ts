@@ -21,6 +21,8 @@ import type {
   SyncPlan,
   SyncResult,
 } from './types'
+import type { Geometry } from 'geojson'
+import type { Bounds } from './search'
 
 export class ApiError extends Error {
   constructor(
@@ -355,19 +357,51 @@ export interface Place {
   name: string
   lat: number
   lng: number
+  /** The place's outline or line (e.g. a road segment), simplified to a few metres. */
+  geometry: Geometry | null
+  bounds: Bounds | null
 }
 
 interface NominatimResult {
   display_name: string
   lat: string
   lon: string
+  /** south, north, west, east */
+  boundingbox?: [string, string, string, string]
+  geojson?: Geometry
 }
 
-/** Place search via OpenStreetMap Nominatim (fair use: only on explicit search). */
-export async function searchPlaces(query: string): Promise<Place[]> {
-  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=6&q=${encodeURIComponent(query)}`
+/**
+ * Place search via OpenStreetMap Nominatim (fair use: only on explicit search). With an area, only
+ * places inside it are returned.
+ */
+export async function searchPlaces(query: string, area?: Bounds): Promise<Place[]> {
+  const params = new URLSearchParams({
+    format: 'json',
+    limit: '8',
+    q: query,
+    polygon_geojson: '1',
+    polygon_threshold: '0.00005',
+  })
+  if (area) {
+    params.set('viewbox', [area.west, area.north, area.east, area.south].map((v) => v.toFixed(5)).join(','))
+    params.set('bounded', '1')
+  }
+  const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`
   const response = await fetch(url, { headers: { Accept: 'application/json' } })
   if (!response.ok) throw new ApiError('Place search is unavailable right now.', response.status)
   const results = (await response.json()) as NominatimResult[]
-  return results.map((r) => ({ name: r.display_name, lat: Number(r.lat), lng: Number(r.lon) }))
+  return results.map((r) => {
+    const box = r.boundingbox?.map(Number)
+    return {
+      name: r.display_name,
+      lat: Number(r.lat),
+      lng: Number(r.lon),
+      geometry: r.geojson ?? null,
+      bounds:
+        box?.length === 4 && box.every(Number.isFinite)
+          ? { south: box[0] ?? 0, north: box[1] ?? 0, west: box[2] ?? 0, east: box[3] ?? 0 }
+          : null,
+    }
+  })
 }

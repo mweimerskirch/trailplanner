@@ -3,6 +3,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { GeoJSONSource, LngLat, Map as MapLibreMap } from 'maplibre-gl'
 import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
+import TrailLegend from '@/components/molecules/TrailLegend.vue'
 import { onActivated, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { DEFAULT_CENTER } from '@/constants'
 import {
@@ -15,6 +16,9 @@ import {
   showMtbOverlay,
   VECTOR_STYLE_URL,
 } from '@/map/layers'
+import { addTrailLayers, setTrailDifficulty, showTrails } from '@/map/trails'
+import { attachWayInfo } from '@/map/wayInfo'
+import { addPlaceLayers, showPlace } from '@/map/place'
 import * as planner from '@/planner'
 import type { GeoPoint, LegType } from '@/types'
 
@@ -26,11 +30,13 @@ maplibregl.setWorkerUrl(workerUrl)
 const container = useTemplateRef<HTMLDivElement>('container')
 const baseMap = ref<BaseMapId>((localStorage.getItem('trailplan.basemap') as BaseMapId | null) ?? 'cyclosm')
 const mtbOverlay = ref(localStorage.getItem('trailplan.mtbOverlay') === 'true')
+const trails = ref(localStorage.getItem('trailplan.trails') === 'true')
 
 let map: MapLibreMap | null = null
 let ready = false
 let markers: maplibregl.Marker[] = []
 let suppressNextClick = false
+let detachWayInfo: (() => void) | null = null
 
 const toPoint = (ll: LngLat): GeoPoint => ({ lat: ll.lat, lng: ll.lng })
 const cssVar = (name: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim()
@@ -351,8 +357,14 @@ function setupInteraction(m: MapLibreMap) {
   })
   m.on('moveend', () => {
     const c = m.getCenter()
+    publishBounds(m)
     localStorage.setItem('trailplan.view', JSON.stringify({ lng: c.lng, lat: c.lat, zoom: m.getZoom() }))
   })
+}
+
+function publishBounds(m: MapLibreMap) {
+  const b = m.getBounds()
+  planner.mapBounds.value = { west: b.getWest(), south: b.getSouth(), east: b.getEast(), north: b.getNorth() }
 }
 
 /**
@@ -416,11 +428,21 @@ onMounted(() => {
 
   m.on('load', () => {
     addRasterLayers(m)
+    addTrailLayers(m, planner.preferences.value.maxDifficulty)
+    addPlaceLayers(m)
     addRouteLayers(m, cssVar('--route'))
     showBaseMap(m, baseMap.value)
     showMtbOverlay(m, mtbOverlay.value)
+    showTrails(m, trails.value)
     ready = true
     setupInteraction(m)
+    publishBounds(m)
+    showPlace(m, planner.placeHighlight.value)
+    // Info on the way under the mouse while the trail overlay is on; the route has its own hover.
+    detachWayInfo = attachWayInfo(m, {
+      enabled: () => trails.value,
+      blocked: (e) => m.queryRenderedFeatures(e.point, { layers: ['route-hit'] }).length > 0,
+    })
     renderRoute()
     renderMarkers()
     renderWarnings()
@@ -437,6 +459,7 @@ onActivated(() => {
 
 onBeforeUnmount(() => {
   darkQuery.removeEventListener('change', onColorSchemeChange)
+  detachWayInfo?.()
   map?.remove()
   map = null
 })
@@ -455,7 +478,22 @@ watch(planner.hoverIndex, () => {
 })
 watch(planner.fitRequest, fitIfRequested)
 watch(planner.flyTarget, (target) => {
-  if (target && map) map.flyTo({ center: [target.lng, target.lat], zoom: 13 })
+  if (!target || !map) return
+  const b = target.bounds
+  if (b) {
+    map.fitBounds(
+      [
+        [b.west, b.south],
+        [b.east, b.north],
+      ],
+      { padding: 80, maxZoom: 15 },
+    )
+  } else {
+    map.flyTo({ center: [target.lng, target.lat], zoom: 13 })
+  }
+})
+watch(planner.placeHighlight, (geometry) => {
+  if (map && ready) showPlace(map, geometry)
 })
 watch(baseMap, (id) => {
   localStorage.setItem('trailplan.basemap', id)
@@ -465,6 +503,16 @@ watch(mtbOverlay, (visible) => {
   localStorage.setItem('trailplan.mtbOverlay', String(visible))
   if (map && ready) showMtbOverlay(map, visible)
 })
+watch(trails, (visible) => {
+  localStorage.setItem('trailplan.trails', String(visible))
+  if (map && ready) showTrails(map, visible)
+})
+watch(
+  () => planner.preferences.value.maxDifficulty,
+  (max) => {
+    if (map && ready) setTrailDifficulty(map, max)
+  },
+)
 </script>
 
 <template>
@@ -479,6 +527,14 @@ watch(mtbOverlay, (visible) => {
         <input v-model="mtbOverlay" type="checkbox" />
         MTB routes
       </label>
+      <label
+        class="check"
+        title="Paths and tracks coloured by difficulty (mtb:scale), from zoom 12. Point at a way for its details."
+      >
+        <input v-model="trails" type="checkbox" />
+        Trails
+      </label>
+      <TrailLegend v-if="trails" class="legend" />
     </div>
   </div>
 </template>
@@ -498,7 +554,9 @@ watch(mtbOverlay, (visible) => {
   left: 10px;
   z-index: 2;
   display: flex;
-  gap: 10px;
+  flex-wrap: wrap;
+  max-width: calc(100% - 70px);
+  gap: 6px 10px;
   align-items: center;
   background: var(--panel);
   border: 1px solid var(--line);
@@ -510,6 +568,11 @@ watch(mtbOverlay, (visible) => {
 .map-layers select {
   width: auto;
   padding: 4px 6px;
+}
+.legend {
+  flex-basis: 100%;
+  /* wraps within the width of the controls instead of widening the panel */
+  contain: inline-size;
 }
 .check {
   display: flex;

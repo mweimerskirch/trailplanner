@@ -286,3 +286,50 @@ code {
   background: #ffffff;
   color: #1c2620;
 }
+
+/* Hover info of the way under the mouse (map/wayInfo.ts), above the map's layer panel. */
+.way-info {
+  z-index: 5;
+  pointer-events: none;
+}
+
+.way-info .maplibregl-popup-content {
+  padding: 7px 10px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.way-info strong {
+  display: block;
+  font-size: 14px;
+}
+
+.way-info .type {
+  display: block;
+  color: #5b6a60;
+}
+
+.way-info dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 1px 8px;
+  margin: 5px 0 0;
+}
+
+.way-info dt {
+  color: #5b6a60;
+}
+
+.way-info dd {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.way-info .chip {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}

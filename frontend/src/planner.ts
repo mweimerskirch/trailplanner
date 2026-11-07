@@ -16,6 +16,8 @@ import type {
 } from './types'
 import { createHistory } from './history'
 import { haversine, type ProfilePoint } from './profile'
+import type { Bounds } from './search'
+import type { Geometry } from 'geojson'
 import { inserted, legType, removed, reversed, withLegType } from './waypoints'
 
 /**
@@ -113,7 +115,12 @@ export const status = ref<StatusMessage | null>(null)
 export const hoverIndex = ref<number | null>(null)
 /** Bumped when the map should zoom to the whole route. */
 export const fitRequest = ref(0)
-export const flyTarget = ref<GeoPoint | null>(null)
+/** Where the map should go: a point, or an area to fit (e.g. a place found by the search). */
+export const flyTarget = ref<(GeoPoint & { bounds?: Bounds | null }) | null>(null)
+/** The place search result to highlight on the map (hovered, or the last one chosen). */
+export const placeHighlight = shallowRef<Geometry | null>(null)
+/** The visible part of the planner map, for the place search. */
+export const mapBounds = shallowRef<Bounds | null>(null)
 /** Bumped when the saved-route list must be reloaded. */
 export const libraryVersion = ref(0)
 

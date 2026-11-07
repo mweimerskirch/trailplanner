@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import ElevationChart from '@/components/organisms/ElevationChart.vue'
@@ -11,12 +11,14 @@ import PlaceSearch from '@/components/molecules/PlaceSearch.vue'
 import PreferencesPanel from '@/components/organisms/PreferencesPanel.vue'
 import RouteStats from '@/components/organisms/RouteStats.vue'
 import {
+  canUndo,
   hoverIndex,
   openRoute,
   profile,
   routeId,
   setStatus,
   status,
+  undo,
   viewOnly,
   waypoints,
 } from '@/planner'
@@ -65,6 +67,33 @@ const hint = computed(() => {
 
 /** The point hovered on the chart or map (shared with MapView through the planner). */
 const hover = hoverIndex
+
+// ---------- keyboard ----------
+
+/** Text fields keep their own Ctrl+Z; sliders, checkboxes and buttons do not have one. */
+function editsText(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  if (target.isContentEditable || target.tagName === 'TEXTAREA') return true
+  return target instanceof HTMLInputElement && !['range', 'checkbox', 'radio', 'button'].includes(target.type)
+}
+
+/** Ctrl+Z (Cmd+Z on a Mac) undoes the last change, unless a text field has the focus. */
+function onKeydown(event: KeyboardEvent) {
+  if (!onPlanner() || event.repeat) return
+  if (!(event.ctrlKey || event.metaKey) || event.shiftKey || event.altKey) return
+  if (event.key.toLowerCase() !== 'z') return
+  if (editsText(event.target)) return
+  if (document.querySelector('dialog[open]')) return
+  event.preventDefault()
+  if (canUndo.value) undo()
+}
+
+onMounted(() => {
+  document.addEventListener('keydown', onKeydown)
+})
+onBeforeUnmount(() => {
+  document.removeEventListener('keydown', onKeydown)
+})
 </script>
 
 <template>
