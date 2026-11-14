@@ -5,7 +5,7 @@ import { RouterLink, useRoute } from 'vue-router'
 import Avatar from '@/components/atoms/Avatar.vue'
 import type { Rider } from '@/types'
 
-/** The rider's avatar and name, opening a menu to switch or manage riders. */
+/** The rider's avatar and name, opening a menu with their profile and to switch or manage riders. */
 defineProps<{ rider: Rider }>()
 
 const route = useRoute()
@@ -51,6 +51,7 @@ onBeforeUnmount(() => {
           </template>
         </i18n-t>
       </p>
+      <RouterLink to="/profile" role="menuitem">{{ t('riders.menu.profile') }}</RouterLink>
       <RouterLink to="/riders" role="menuitem">{{ t('riders.menu.switch') }}</RouterLink>
       <RouterLink :to="{ path: '/riders', query: { manage: '1' } }" role="menuitem">{{
         t('riders.manage')

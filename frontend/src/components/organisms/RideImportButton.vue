@@ -1,20 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
+import { myDevice } from '@/devices'
 import * as planner from '@/planner'
 import type { DeviceInfo } from '@/types'
 
 /**
  * "Import from ELEMNT": imports the rides recorded on a USB-connected device that are not imported
- * yet. One button per device that has recorded rides.
+ * yet. Shown only if the rider's device has recorded rides.
  */
 const emit = defineEmits<{ imported: [] }>()
 
-const { t, locale } = useI18n()
-const devices = ref<DeviceInfo[]>([])
+const { t } = useI18n()
 const busyId = ref<string | null>(null)
-const withRides = computed(() => devices.value.filter((d) => d.usbSync?.importsRides))
+const withRides = computed(() => (myDevice.value?.usbSync?.importsRides ? [myDevice.value] : []))
 
 async function importFrom(device: DeviceInfo) {
   const label = device.usbSync?.label ?? device.name
@@ -44,18 +44,6 @@ async function importFrom(device: DeviceInfo) {
     busyId.value = null
   }
 }
-
-async function loadDevices() {
-  try {
-    devices.value = await api.devices()
-  } catch {
-    devices.value = []
-  }
-}
-
-onMounted(loadDevices)
-// Device texts come from the server in the chosen language.
-watch(locale, () => void loadDevices())
 </script>
 
 <template>

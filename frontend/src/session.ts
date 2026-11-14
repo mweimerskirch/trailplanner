@@ -26,6 +26,20 @@ export async function chooseRider(id: number) {
   setRider(user)
 }
 
+/** Sets the chosen rider's device (null: files only). */
+export async function setRiderDevice(device: string | null) {
+  const rider = currentRider.value
+  if (!rider) return
+  currentRider.value = await api.setRiderDevice(rider.id, device)
+}
+
+/** Renames the chosen rider. */
+export async function renameRider(name: string) {
+  const rider = currentRider.value
+  if (!rider) return
+  currentRider.value = await api.renameRider(rider.id, name)
+}
+
 /** The server no longer knows the chosen rider (deleted elsewhere): forget it. */
 export function forgetRider() {
   currentRider.value = null

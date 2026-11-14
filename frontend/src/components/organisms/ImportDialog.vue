@@ -3,8 +3,9 @@ import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api, ApiError } from '@/api'
 import TabBar from '@/components/molecules/TabBar.vue'
+import { FILES_ONLY, myDevice } from '@/devices'
 import { day, km, num } from '@/format'
-import type { DeviceInfo, ImportResult, KomootStatus, KomootTour } from '@/types'
+import type { ImportResult, KomootStatus, KomootTour } from '@/types'
 
 const emit = defineEmits<{ imported: [openId: number | null] }>()
 const { t } = useI18n()
@@ -16,8 +17,10 @@ const error = ref('')
 const results = ref<ImportResult[]>([])
 const dragging = ref(false)
 
-const devices = ref<DeviceInfo[]>([])
-const deviceHints = computed(() => devices.value.filter((d) => d.importInstructions))
+// How to get routes off the rider's device, if it is a real device (not files only).
+const deviceHints = computed(() =>
+  myDevice.value?.importInstructions && myDevice.value.id !== FILES_ONLY ? [myDevice.value] : [],
+)
 
 const komoot = ref<KomootStatus>({ connected: false, displayName: null })
 const email = ref('')
@@ -43,7 +46,7 @@ async function open() {
   results.value = []
   dialog.value?.showModal()
   try {
-    ;[devices.value, komoot.value] = await Promise.all([api.devices(), api.komootStatus()])
+    komoot.value = await api.komootStatus()
     if (komoot.value.connected && tours.value.length === 0) await loadTours()
   } catch (e) {
     error.value = e instanceof Error ? e.message : t('common.error.unreachable')

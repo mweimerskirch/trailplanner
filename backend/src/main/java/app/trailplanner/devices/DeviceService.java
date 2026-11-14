@@ -59,6 +59,11 @@ public class DeviceService {
   }
 
   /** The device's USB sync; 404 if the device is unknown or cannot sync over USB. */
+  /** Whether a device with this id is registered. */
+  public boolean exists(String deviceId) {
+    return devices.containsKey(deviceId);
+  }
+
   public UsbSync usbSync(String deviceId) {
     DeviceIntegration device = devices.get(deviceId);
     if (device == null) {

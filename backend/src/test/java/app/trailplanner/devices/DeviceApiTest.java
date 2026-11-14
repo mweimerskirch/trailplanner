@@ -48,7 +48,7 @@ class DeviceApiTest {
 
     assertThat(http.inLanguage("fr").get("/api/devices").body())
         .contains("\"title\":\"Copier par USB\"")
-        .contains("\"name\":\"Autre appareil ou application\"")
+        .contains("\"name\":\"Aucun appareil : fichiers GPX et FIT\"")
         .contains("\"label\":\"parcours FIT\"")
         .contains("supprimez-les aussi sur l’appareil");
     assertThat(http.inLanguage("de-DE,de;q=0.9").get("/api/devices").body())

@@ -11,14 +11,17 @@ import org.springframework.stereotype.Component;
 @Order(Ordered.LOWEST_PRECEDENCE)
 public class GenericDevice implements DeviceIntegration {
 
+  /** Also what a rider without a device gets (files only). */
+  public static final String ID = "generic";
+
   @Override
   public String id() {
-    return "generic";
+    return ID;
   }
 
   @Override
   public String name() {
-    return "Other device or app";
+    return "No device: GPX and FIT files";
   }
 
   @Override

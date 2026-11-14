@@ -1,21 +1,21 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { askConfirm } from '@/confirm'
+import { myDevice } from '@/devices'
 import * as planner from '@/planner'
 import type { DeviceInfo, SyncPlan } from '@/types'
 
 /**
  * "Sync to ELEMNT": makes the USB-connected device hold exactly the rider's active routes. New and
  * changed routes are copied; files on the device that are not active routes are deleted only after
- * the rider confirms them.
+ * the rider confirms them. Shown only if the rider's device syncs over USB.
  */
-const devices = ref<DeviceInfo[]>([])
 const busyId = ref<string | null>(null)
-const syncable = computed(() => devices.value.filter((d) => d.usbSync))
+const syncable = computed(() => (myDevice.value?.usbSync ? [myDevice.value] : []))
 
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 async function confirmRemovals(device: DeviceInfo, plan: SyncPlan): Promise<string[]> {
   if (!plan.remove.length) return []
@@ -80,18 +80,6 @@ async function sync(device: DeviceInfo) {
     busyId.value = null
   }
 }
-
-async function loadDevices() {
-  try {
-    devices.value = await api.devices()
-  } catch {
-    devices.value = []
-  }
-}
-
-onMounted(loadDevices)
-// Device texts come from the server in the chosen language.
-watch(locale, () => void loadDevices())
 </script>
 
 <template>

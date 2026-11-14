@@ -310,6 +310,11 @@ export const api = {
     return json<Rider>('/api/users', { method: 'POST', body: JSON.stringify({ name }) })
   },
 
+  /** null: files only. */
+  setRiderDevice(id: number, device: string | null) {
+    return json<Rider>(`/api/users/${id}/device`, { method: 'PUT', body: JSON.stringify({ device }) })
+  },
+
   renameRider(id: number, name: string) {
     return json<Rider>(`/api/users/${id}`, { method: 'PATCH', body: JSON.stringify({ name }) })
   },

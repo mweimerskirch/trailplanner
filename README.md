@@ -1,7 +1,7 @@
 # Trail Planner
 
-A self-hosted mountain-bike route planner on OpenStreetMap data, for planning rides on a Wahoo
-ELEMNT BOLT. It also plans road-bike rides and horseback rides.
+A self-hosted mountain-bike route planner on OpenStreetMap data. It also plans road-bike rides and
+horseback rides. Routes go to a Wahoo ELEMNT over USB, or as GPX and FIT files to any device or app.
 
 - Click the map to set points, drag points to move them, drag the route line to add a via point.
 - Routing prefers the way types you choose (singletrails, forest tracks, roads …), respects a
@@ -53,13 +53,18 @@ Routing only works where the data is downloaded. For a larger area, pass tile na
 45–50° north. Restart with `docker compose up -d` after changing `.env`.
 
 **Riders.** On first start you add riders (just names). Each rider has their own library, trash,
-imports, presets and planner state; the chosen rider is remembered per browser.
+imports, presets and planner state; the chosen rider is remembered per browser. Each rider also
+picks their device on their **Profile** page (rider menu, top right): with **No device: GPX and FIT files** (the
+default for new riders) the planner just offers file downloads; with a Wahoo ELEMNT the library and
+rides pages get its sync and import buttons and the planner its instructions.
 
 > **No login.** Riders have no passwords and Trail Planner has no authentication: everyone who can reach
 > it can open every rider's library. Run it on your own machine or
 > home network. If you expose it to the internet, put it behind a reverse proxy with authentication.
 
 ## Getting routes onto the BOLT
+
+Choose **Wahoo ELEMNT** as your device on your Profile page first (rider menu, top right).
 
 **Sync over USB (recommended).** Switch the BOLT on, connect it with a USB data cable to the computer
 that runs Trail Planner, and choose **Sync to ELEMNT** in the library. The BOLT's `routes` folder then

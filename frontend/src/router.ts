@@ -3,6 +3,7 @@ import { onNoRider } from './api'
 import { currentRider, forgetRider, loadSession } from './session'
 import LibraryPage from './pages/LibraryPage.vue'
 import PlannerPage from './pages/PlannerPage.vue'
+import ProfilePage from './pages/ProfilePage.vue'
 import RidePage from './pages/RidePage.vue'
 import RidesPage from './pages/RidesPage.vue'
 import RidersPage from './pages/RidersPage.vue'
@@ -19,6 +20,8 @@ export const router = createRouter({
     // Recorded rides: '/rides', and one ride at '/rides/<id>'.
     { path: '/rides', name: 'rides', component: RidesPage },
     { path: '/rides/:id(\\d+)', name: 'ride', component: RidePage },
+    // The chosen rider's settings (name, device).
+    { path: '/profile', name: 'profile', component: ProfilePage },
     { path: '/:pathMatch(.*)*', redirect: '/' },
   ],
 })

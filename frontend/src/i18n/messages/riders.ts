@@ -26,6 +26,7 @@ export const en = {
   menu: {
     planningAs: 'Planning as {name}',
     switch: 'Switch rider',
+    profile: 'Profile',
   },
 }
 
@@ -55,6 +56,7 @@ export const fr: typeof en = {
   menu: {
     planningAs: 'Profil : {name}',
     switch: 'Changer de profil',
+    profile: 'Profil',
   },
 }
 
@@ -84,5 +86,6 @@ export const de: typeof en = {
   menu: {
     planningAs: 'Du planst als {name}',
     switch: 'Profil wechseln',
+    profile: 'Profil',
   },
 }

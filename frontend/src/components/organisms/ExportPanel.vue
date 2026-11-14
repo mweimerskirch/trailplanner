@@ -1,28 +1,20 @@
 <script setup lang="ts">
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { api, ApiError } from '@/api'
+import { api } from '@/api'
 import StarToggle from '@/components/atoms/StarToggle.vue'
+import { myDevice as device } from '@/devices'
 import { saveFile } from '@/files'
 import * as planner from '@/planner'
-import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
+import type { FormatInfo, RouteDetails } from '@/types'
 
-const DEVICE_KEY = 'trailplan.device'
-
-const { t, locale } = useI18n()
+const { t } = useI18n()
 
 const busy = ref(false)
-const devices = ref<DeviceInfo[]>([])
-const deviceId = ref(localStorage.getItem(DEVICE_KEY) ?? '')
 const canShareFiles = ref(false)
 
-/** The chosen device; the first one (the backend's order) if nothing was chosen yet. */
-const device = computed(() => devices.value.find((d) => d.id === deviceId.value) ?? devices.value[0])
+// The formats and instructions are the rider's device's (set in the rider menu).
 const ready = computed(() => !busy.value && planner.routeComplete.value)
-
-watch(deviceId, (id) => {
-  localStorage.setItem(DEVICE_KEY, id)
-})
 
 async function run(task: () => Promise<void>) {
   busy.value = true
@@ -87,28 +79,13 @@ const share = (format: FormatInfo) =>
     }
   })
 
-// Device texts come from the server in the chosen language.
-watch(locale, () => void loadDevices())
-
-async function loadDevices() {
-  try {
-    devices.value = await api.devices()
-    // Nothing chosen yet (or a device that no longer exists): show the first one as selected.
-    const first = devices.value[0]
-    if (first && !devices.value.some((d) => d.id === deviceId.value)) deviceId.value = first.id
-  } catch (error) {
-    if (!(error instanceof ApiError)) throw error
-  }
-}
-
-onMounted(async () => {
+onMounted(() => {
   try {
     const probe = new File(['x'], 'probe.gpx', { type: 'application/gpx+xml' })
     canShareFiles.value = typeof navigator.canShare === 'function' && navigator.canShare({ files: [probe] })
   } catch {
     canShareFiles.value = false
   }
-  await loadDevices()
 })
 </script>
 
@@ -143,12 +120,6 @@ onMounted(async () => {
     </div>
 
     <template v-if="device">
-      <div v-if="devices.length > 1" class="field device">
-        <label for="device">{{ t('planner.export.sendTo') }}</label>
-        <select id="device" v-model="deviceId">
-          <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
-        </select>
-      </div>
       <div class="row">
         <button
           v-for="format in device.formats"
@@ -194,12 +165,8 @@ onMounted(async () => {
   align-items: center;
   gap: 4px;
 }
-.row + .row,
-.device + .row {
+.row + .row {
   margin-top: 8px;
-}
-.device {
-  margin-top: 12px;
 }
 details {
   margin-top: 12px;

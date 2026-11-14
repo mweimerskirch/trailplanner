@@ -1,6 +1,9 @@
 package app.trailplanner.users;
 
+import app.trailplanner.devices.DeviceService;
+import app.trailplanner.devices.GenericDevice;
 import app.trailplanner.presets.PresetService;
+import app.trailplanner.web.ApiException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
@@ -36,6 +39,9 @@ public class UserController {
 
   public record ChooseRequest(@NotNull Long userId) {}
 
+  /** {@code device}: a device id from GET /api/devices; null or "generic" for files only. */
+  public record DeviceRequest(String device) {}
+
   /** {@code user} is null when no rider is chosen. */
   public record Session(CurrentUser user) {}
 
@@ -46,13 +52,19 @@ public class UserController {
   private final CurrentUserResolver currentUser;
   private final Clock clock;
   private final PresetService presets;
+  private final DeviceService devices;
 
   public UserController(
-      UserRepository users, CurrentUserResolver currentUser, Clock clock, PresetService presets) {
+      UserRepository users,
+      CurrentUserResolver currentUser,
+      Clock clock,
+      PresetService presets,
+      DeviceService devices) {
     this.users = users;
     this.currentUser = currentUser;
     this.clock = clock;
     this.presets = presets;
+    this.devices = devices;
   }
 
   @GetMapping("/users")
@@ -72,6 +84,22 @@ public class UserController {
   @PatchMapping("/users/{id}")
   public CurrentUser rename(@PathVariable long id, @Valid @RequestBody NameRequest request) {
     if (!users.rename(id, request.name().strip())) {
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Rider " + id + " does not exist.");
+    }
+    return users.findById(id).orElseThrow();
+  }
+
+  /** Sets the rider's device: the UI shows buttons and instructions only for it. */
+  @PutMapping("/users/{id}/device")
+  public CurrentUser setDevice(@PathVariable long id, @RequestBody DeviceRequest request) {
+    String device = request.device();
+    if (device == null || device.equals(GenericDevice.ID)) {
+      device = null;
+    } else if (!devices.exists(device)) {
+      throw new ApiException(
+          HttpStatus.BAD_REQUEST, "Unknown device", "There is no device \"" + device + "\".");
+    }
+    if (!users.setDevice(id, device)) {
       throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Rider " + id + " does not exist.");
     }
     return users.findById(id).orElseThrow();

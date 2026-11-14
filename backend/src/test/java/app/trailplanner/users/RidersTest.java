@@ -54,6 +54,25 @@ class RidersTest {
   }
 
   @Test
+  void eachRiderHasTheirOwnDeviceFilesOnlyByDefault() throws Exception {
+    TestHttp http = new TestHttp(port);
+    long id = http.chooseNewRider("Dora");
+    assertThat(http.get("/api/session").body()).contains("\"device\":null");
+
+    assertThat(
+            http.send("PUT", "/api/users/" + id + "/device", "{\"device\":\"wahoo-elemnt\"}")
+                .body())
+        .contains("\"device\":\"wahoo-elemnt\"");
+    assertThat(http.get("/api/session").body()).contains("\"device\":\"wahoo-elemnt\"");
+
+    var unknown = http.send("PUT", "/api/users/" + id + "/device", "{\"device\":\"pager\"}");
+    assertThat(unknown.statusCode()).isEqualTo(400);
+
+    assertThat(http.send("PUT", "/api/users/" + id + "/device", "{\"device\":\"generic\"}").body())
+        .contains("\"device\":null");
+  }
+
+  @Test
   void ridersOnlySeeTheirOwnRoutes() throws Exception {
     TestHttp anna = new TestHttp(port);
     TestHttp ben = new TestHttp(port);

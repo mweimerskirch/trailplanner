@@ -2,12 +2,13 @@ import * as common from './common'
 import * as library from './library'
 import * as map from './map'
 import * as planner from './planner'
+import * as profile from './profile'
 import * as rides from './rides'
 import * as riders from './riders'
 import * as routing from './routing'
 
 /** One module per area of the app, each with the same keys in every language. */
-const areas = { common, routing, map, planner, library, rides, riders }
+const areas = { common, routing, map, planner, library, rides, riders, profile }
 
 type Area = keyof typeof areas
 type Language = 'en' | 'fr' | 'de'

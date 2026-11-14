@@ -38,9 +38,10 @@ public class UserRepository {
   }
 
   public Optional<CurrentUser> findById(long id) {
-    return jdbc.sql("SELECT id, name FROM rider WHERE id = :id")
+    return jdbc.sql("SELECT id, name, device FROM rider WHERE id = :id")
         .param("id", id)
-        .query((rs, row) -> new CurrentUser(rs.getLong("id"), rs.getString("name")))
+        .query((rs, row) ->
+            new CurrentUser(rs.getLong("id"), rs.getString("name"), rs.getString("device")))
         .optional();
   }
 
@@ -61,6 +62,15 @@ public class UserRepository {
     return jdbc.sql("UPDATE rider SET name = :name WHERE id = :id")
             .param("id", id)
             .param("name", name)
+            .update()
+        == 1;
+  }
+
+  /** {@code device}: a device id, or null for files only. */
+  public boolean setDevice(long id, String device) {
+    return jdbc.sql("UPDATE rider SET device = :device WHERE id = :id")
+            .param("id", id)
+            .param("device", device)
             .update()
         == 1;
   }

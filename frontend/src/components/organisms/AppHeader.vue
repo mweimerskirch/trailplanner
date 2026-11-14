@@ -14,7 +14,7 @@ const { t } = useI18n()
 /** "Planner" goes back to the open route, if any, not to an empty planner. */
 const plannerLink = computed(() => (routeId.value === null ? '/' : `/routes/${String(routeId.value)}`))
 const section = computed(() => {
-  if (route.name === 'library' || route.name === 'riders') return route.name
+  if (route.name === 'library' || route.name === 'riders' || route.name === 'profile') return route.name
   if (route.name === 'rides' || route.name === 'ride') return 'rides'
   return 'planner'
 })

@@ -77,7 +77,9 @@ A component may only use components from its own level or below. Ask for confirm
 - Devices: implement `devices.DeviceIntegration` as a Spring bean (`@Order` sets its position).
   It declares export formats, transfer instructions, import instructions and an optional
   `UsbSync` (label, device match, folder, format). The UI builds the export panel and the
-  library's sync button from `GET /api/devices`, so a new device needs no frontend change.
+  library's sync button from `GET /api/devices`, so a new device needs no frontend change. Each
+  rider has one device (`rider.device`, null = `generic`, files only), chosen on the profile page;
+  `frontend/src/devices.ts` (`myDevice`) decides which buttons and instructions are shown.
 - USB sync: `DeviceSyncService` mirrors the rider's active routes into the device folder and
   deletes other files only when the rider confirms them by name. Device access goes through
   `MtpDevice`; the real one (`LibmtpHelper`) runs the C helper `backend/mtp/trailplanner-mtp.c`

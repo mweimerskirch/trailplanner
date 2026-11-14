@@ -250,6 +250,8 @@ export interface KomootTour {
 export interface Rider {
   id: number
   name: string
+  /** The rider's device (a DeviceInfo id); null: files only (the "generic" device). */
+  device: string | null
 }
 
 export interface RiderSummary extends Rider {
