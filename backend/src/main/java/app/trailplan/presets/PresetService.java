@@ -13,7 +13,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Riding-style presets per rider. Every rider gets the {@link DefaultPresets} once: new riders when
- * they are created, existing riders on the first start after presets were added.
+ * they are created, existing riders on the first start after presets were added (only the ones
+ * added since they were last seeded).
  */
 @Service
 public class PresetService implements ApplicationRunner {
@@ -26,23 +27,33 @@ public class PresetService implements ApplicationRunner {
     this.clock = clock;
   }
 
-  /** Gives every rider who has not had them yet the built-in presets. */
+  /** Gives every rider the built-in presets they have not had yet. */
   @Override
   public void run(ApplicationArguments args) {
     seedMissing();
   }
 
   public void seedMissing() {
-    presets.ridersWithoutDefaults().forEach(this::seed);
+    presets.seededVersions(DefaultPresets.VERSION).forEach(this::seed);
   }
 
-  /** The built-in presets for one rider (skipping names they already use), once. */
-  @Transactional
+  /** The built-in presets for a new rider. */
   public void seed(long userId) {
+    seed(userId, 0);
+  }
+
+  /**
+   * The built-in presets added after {@code seededVersion} (skipping names the rider already uses),
+   * once.
+   */
+  @Transactional
+  public void seed(long userId, int seededVersion) {
     for (DefaultPresets.Preset preset : DefaultPresets.ALL) {
-      presets.insert(userId, preset.name(), preset.preferences(), clock.instant());
+      if (preset.since() > seededVersion) {
+        presets.insert(userId, preset.name(), preset.preferences(), clock.instant());
+      }
     }
-    presets.markSeeded(userId);
+    presets.markSeeded(userId, DefaultPresets.VERSION);
   }
 
   public List<Preset> list(CurrentUser user) {

@@ -1,5 +1,8 @@
 <script setup lang="ts">
 import { TRAIL_COLORS } from '@/map/trails'
+import type { Activity } from '@/types'
+
+const { activity = 'MTB' } = defineProps<{ activity?: Activity }>()
 
 /** Key to the trail overlay's colours. */
 const GRADES = [
@@ -18,7 +21,13 @@ const GRADES = [
     <li title="Path or track without a grade">
       <span class="line dashed" :style="{ color: TRAIL_COLORS.unrated }" />unrated
     </li>
-    <li title="Closed to bikes (access or bicycle = no / private)">
+    <li
+      v-if="activity === 'HORSE'"
+      title="Closed (access = no / private). The map tiles have no horse access."
+    >
+      <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />no access
+    </li>
+    <li v-else title="Closed to bikes (access or bicycle = no / private)">
       <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />no bikes
     </li>
   </ul>

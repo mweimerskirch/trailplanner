@@ -1,5 +1,5 @@
 import type { ExpressionSpecification, FilterSpecification, Map as MapLibreMap } from 'maplibre-gl'
-import type { TrailDifficulty } from '@/types'
+import type { Activity, TrailDifficulty } from '@/types'
 
 /**
  * Trail overlay drawn from the OpenStreetMap data in the vector base map (OpenMapTiles schema,
@@ -47,19 +47,33 @@ const TRAILS: ExpressionSpecification = [
   ],
 ]
 
-/** Closed to bikes: access=no/private or bicycle=no. */
-const FORBIDDEN: ExpressionSpecification = [
-  'any',
-  ['in', ['coalesce', ['get', 'access'], ''], ['literal', ['no', 'private']]],
-  ['==', ['coalesce', ['get', 'bicycle'], ''], 'no'],
+const NO_ACCESS: ExpressionSpecification = [
+  'in',
+  ['coalesce', ['get', 'access'], ''],
+  ['literal', ['no', 'private']],
 ]
+
+/**
+ * Closed to the activity: access=no/private, and for bikes bicycle=no. The tiles carry no horse
+ * tag, so for horses only general access counts.
+ */
+function forbidden(activity: Activity): ExpressionSpecification {
+  return activity === 'HORSE'
+    ? NO_ACCESS
+    : ['any', NO_ACCESS, ['==', ['coalesce', ['get', 'bicycle'], ''], 'no']]
+}
 
 const PAVED: ExpressionSpecification = ['==', ['coalesce', ['get', 'surface'], ''], 'paved']
 
-const forbiddenFilter: FilterSpecification = ['all', TRAILS, FORBIDDEN]
-const ratedFilter: FilterSpecification = ['all', TRAILS, ['!', FORBIDDEN], ['>=', GRADE, 0]]
-/** Unrated paths and tracks that are not paved: paved ones are on every base map already. */
-const unratedFilter: FilterSpecification = ['all', TRAILS, ['!', FORBIDDEN], ['<', GRADE, 0], ['!', PAVED]]
+function filters(activity: Activity): Record<'forbidden' | 'rated' | 'unrated', FilterSpecification> {
+  const closed = forbidden(activity)
+  return {
+    forbidden: ['all', TRAILS, closed],
+    rated: ['all', TRAILS, ['!', closed], ['>=', GRADE, 0]],
+    // Unrated paths and tracks that are not paved: paved ones are on every base map already.
+    unrated: ['all', TRAILS, ['!', closed], ['<', GRADE, 0], ['!', PAVED]],
+  }
+}
 const haloFilter: FilterSpecification = ['all', TRAILS, ['any', ['>=', GRADE, 0], ['!', PAVED]]]
 
 const width = (base: number): ExpressionSpecification => [
@@ -88,14 +102,24 @@ const GRADE_COLOR: ExpressionSpecification = [
 
 const MAX_GRADE: Record<TrailDifficulty, number> = { S0: 0, S1: 1, S2: 2, S3: 3, S4: 4, S5: 5, ANY: 99 }
 
-/** Trails harder than the rider allows are faded. */
-function ratedOpacity(maxDifficulty: TrailDifficulty): ExpressionSpecification {
-  return ['case', ['>', GRADE, MAX_GRADE[maxDifficulty]], 0.3, 0.95]
+/** What the overlay adapts to: the planned activity and, for mountain bikes, the hardest grade. */
+export interface TrailStyle {
+  activity: Activity
+  maxDifficulty: TrailDifficulty
+}
+
+const ANY_STYLE: TrailStyle = { activity: 'MTB', maxDifficulty: 'ANY' }
+
+/** Mountain bikes: trails harder than the rider allows are faded. */
+function ratedOpacity(style: TrailStyle): ExpressionSpecification {
+  const max = style.activity === 'MTB' ? MAX_GRADE[style.maxDifficulty] : MAX_GRADE.ANY
+  return ['case', ['>', GRADE, max], 0.3, 0.95]
 }
 
 /** Adds the (hidden) trail layers. Call after the raster layers, so they are drawn on top of them. */
-export function addTrailLayers(map: MapLibreMap, maxDifficulty: TrailDifficulty = 'ANY') {
+export function addTrailLayers(map: MapLibreMap, style: TrailStyle = ANY_STYLE) {
   if (!map.getSource(SOURCE)) return
+  const filter = filters(style.activity)
   const common = { source: SOURCE, 'source-layer': SOURCE_LAYER, minzoom: MIN_ZOOM } as const
   const layout = { visibility: 'none', 'line-join': 'round', 'line-cap': 'round' } as const
   map.addLayer({
@@ -110,7 +134,7 @@ export function addTrailLayers(map: MapLibreMap, maxDifficulty: TrailDifficulty 
     id: 'trails-forbidden',
     type: 'line',
     ...common,
-    filter: forbiddenFilter,
+    filter: filter.forbidden,
     layout: { ...layout, 'line-cap': 'butt' },
     paint: {
       'line-color': TRAIL_COLORS.forbidden,
@@ -123,7 +147,7 @@ export function addTrailLayers(map: MapLibreMap, maxDifficulty: TrailDifficulty 
     id: 'trails-unrated',
     type: 'line',
     ...common,
-    filter: unratedFilter,
+    filter: filter.unrated,
     layout: { ...layout, 'line-cap': 'butt' },
     paint: {
       'line-color': TRAIL_COLORS.unrated,
@@ -136,12 +160,12 @@ export function addTrailLayers(map: MapLibreMap, maxDifficulty: TrailDifficulty 
     id: 'trails-rated',
     type: 'line',
     ...common,
-    filter: ratedFilter,
+    filter: filter.rated,
     layout,
     paint: {
       'line-color': GRADE_COLOR,
       'line-width': width(3),
-      'line-opacity': ratedOpacity(maxDifficulty),
+      'line-opacity': ratedOpacity(style),
     },
   })
 }
@@ -152,8 +176,11 @@ export function showTrails(map: MapLibreMap, visible: boolean) {
   }
 }
 
-export function setTrailDifficulty(map: MapLibreMap, maxDifficulty: TrailDifficulty) {
-  if (map.getLayer('trails-rated')) {
-    map.setPaintProperty('trails-rated', 'line-opacity', ratedOpacity(maxDifficulty))
-  }
+export function setTrailStyle(map: MapLibreMap, style: TrailStyle) {
+  if (!map.getLayer('trails-rated')) return
+  const filter = filters(style.activity)
+  map.setFilter('trails-forbidden', filter.forbidden)
+  map.setFilter('trails-rated', filter.rated)
+  map.setFilter('trails-unrated', filter.unrated)
+  map.setPaintProperty('trails-rated', 'line-opacity', ratedOpacity(style))
 }

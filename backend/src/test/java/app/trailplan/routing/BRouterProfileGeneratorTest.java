@@ -73,4 +73,50 @@ class BRouterProfileGeneratorTest {
         .contains("switch or blocked badoneway 8\n")
         .contains("switch highway=motorway|motorway_link 10000\n");
   }
+
+  @Test
+  void mountainBikeIsTheDefaultActivity() {
+    assertThat(RoutingPreferences.defaults().activity()).isEqualTo(Activity.MTB);
+    assertThat(generator.generate(RoutingPreferences.defaults()))
+        .isEqualTo(generator.generate(withActivity(Activity.MTB)))
+        .doesNotContain("surfacemult")
+        .doesNotContain("horse");
+  }
+
+  @Test
+  void roadBikesStayOnPavedWaysAndOffGradedTrails() {
+    String profile = generator.generate(withActivity(Activity.ROAD));
+
+    assertThat(profile)
+        .contains("assign rough or surface=unpaved|gravel|ground")
+        .contains("|grass_paver or smoothness=bad|")
+        .contains("and highway=track and surface= not tracktype=grade1")
+        .contains("  switch rough 10000\n")
+        .contains("  switch surface=compacted|fine_gravel 3\n")
+        .contains("assign toohard not mtb:scale=\n")
+        .contains("  switch highway=path switch bicycle=designated ")
+        .contains("  switch highway=steps 15\n")
+        .contains("assign forestmult 1\n")
+        .contains("  multiply multiply typecost surfacemult trafficmult\n");
+  }
+
+  @Test
+  void horsesFollowHorseAccessAndCannotUseStepsOrStiles() {
+    String profile = generator.generate(withActivity(Activity.HORSE));
+
+    assertThat(profile)
+        .contains("assign horseno horse=no|private\n")
+        .contains("assign notforhorses and highway=footway|pedestrian|cycleway not horseyes\n")
+        .contains("assign blocked or or horseno notforhorses and accessno not horseyes\n")
+        .doesNotContain("bicycle")
+        .contains("  switch highway=trunk|trunk_link 10000\n")
+        .contains("  switch highway=steps 10000\n")
+        .contains("assign toohard sac_scale=demanding_mountain_hiking|")
+        .contains("  switch surface=asphalt|concrete|paved 1.3\n")
+        .contains("assign initialcost switch and barrier=stile|");
+  }
+
+  private static RoutingPreferences withActivity(Activity activity) {
+    return new RoutingPreferences(null, null, null, false, activity);
+  }
 }

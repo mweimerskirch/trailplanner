@@ -1,7 +1,8 @@
 import { computed, nextTick, ref, shallowRef, toRaw, watch } from 'vue'
 import { api, ApiError } from './api'
-import { DEFAULT_PREFERENCES } from './constants'
+import { ACTIVITIES, activityInfo, DEFAULT_PREFERENCES } from './constants'
 import type {
+  Activity,
   GeoPoint,
   LegBreakdown,
   RouteDetails,
@@ -63,7 +64,10 @@ interface StoredState {
   routeUpdatedAt?: string | null
   hasOriginal?: boolean
   favorite?: boolean
+  /** Before activities: the mountain-bike speed. */
   speed?: number
+  /** Average speed per activity. */
+  speeds?: Partial<Record<Activity, number>>
   /** An imported route is open in view mode; its track is fetched again on load. */
   viewOnly?: boolean
 }
@@ -104,8 +108,19 @@ export const routeUpdatedAt = ref<string | null>(null)
 export const hasOriginal = ref(false)
 /** The open saved route is starred. */
 export const favorite = ref(false)
-/** Average speed on the flat in km/h, for the time estimate only. */
-export const speed = ref(16)
+function defaultSpeeds(): Record<Activity, number> {
+  return Object.fromEntries(ACTIVITIES.map((a) => [a.value, a.speed])) as Record<Activity, number>
+}
+
+/** Average speed on the flat in km/h per activity, for the time estimate only. */
+const speeds = ref<Record<Activity, number>>(defaultSpeeds())
+/** The average speed for the current activity. */
+export const speed = computed({
+  get: () => speeds.value[preferences.value.activity],
+  set: (value: number) => {
+    speeds.value[preferences.value.activity] = value
+  },
+})
 /** Set while an imported, not yet converted route is open (view mode). */
 export const fixedTrack = shallowRef<FixedTrack | null>(null)
 export const viewOnly = computed(() => fixedTrack.value !== null)
@@ -139,13 +154,23 @@ interface Snapshot {
   fixedTrack: FixedTrack | null
 }
 
+// A default route name follows the activity ("MTB tour" becomes "Road ride"); own names stay.
+watch(
+  () => preferences.value.activity,
+  (activity) => {
+    if (ACTIVITIES.some((a) => a.routeName === routeName.value)) {
+      routeName.value = activityInfo(activity).routeName
+    }
+  },
+)
+
 const history = createHistory<Snapshot>(MAX_HISTORY)
 export const canUndo = ref(false)
 /** True while the planner applies a snapshot or loads state; such changes are not undo steps. */
 let restoring = false
 
 watch(
-  [waypoints, preferences, routeName, routeId, routeUpdatedAt, hasOriginal, favorite, speed, fixedTrack],
+  [waypoints, preferences, routeName, routeId, routeUpdatedAt, hasOriginal, favorite, speeds, fixedTrack],
   () => {
     if (!storageKey) return
     const state: StoredState = {
@@ -156,7 +181,7 @@ watch(
       routeUpdatedAt: routeUpdatedAt.value,
       hasOriginal: hasOriginal.value,
       favorite: favorite.value,
-      speed: speed.value,
+      speeds: speeds.value,
       viewOnly: fixedTrack.value !== null,
     }
     try {
@@ -190,12 +215,12 @@ export function activateRider(riderId: number) {
     fixedTrack.value = null
     waypoints.value = stored.waypoints ?? []
     preferences.value = mergePreferences(stored.preferences)
-    routeName.value = stored.routeName ?? 'MTB tour'
+    routeName.value = stored.routeName ?? activityInfo(preferences.value.activity).routeName
     routeId.value = stored.routeId ?? null
     routeUpdatedAt.value = stored.routeUpdatedAt ?? null
     hasOriginal.value = stored.hasOriginal ?? false
     favorite.value = stored.favorite ?? false
-    speed.value = stored.speed ?? 16
+    speeds.value = { ...defaultSpeeds(), ...(stored.speed ? { MTB: stored.speed } : {}), ...stored.speeds }
   })
   // An imported route was open in view mode: fetch its track again (it is not kept in storage).
   if (stored.viewOnly && stored.routeId != null) void reloadViewOnly(stored.routeId)
@@ -303,7 +328,7 @@ export function newRoute() {
   routeUpdatedAt.value = null
   hasOriginal.value = false
   favorite.value = false
-  routeName.value = 'MTB tour'
+  routeName.value = activityInfo(preferences.value.activity).routeName
 }
 
 export function openRoute(route: RouteDetails) {
@@ -566,7 +591,7 @@ const okLegs = computed(() => displayLegs.value.flatMap((l) => (l.status === 'ok
 export const totals = computed(() => {
   const distance = okLegs.value.reduce((sum, leg) => sum + leg.distance, 0)
   const ascent = okLegs.value.reduce((sum, leg) => sum + leg.ascent, 0)
-  const hours = distance / 1000 / Math.max(5, speed.value) + ascent / 600
+  const hours = distance / 1000 / Math.max(3, speed.value) + ascent / 600
   return { distance, ascent, hours }
 })
 

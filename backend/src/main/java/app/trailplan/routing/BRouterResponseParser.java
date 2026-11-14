@@ -19,6 +19,11 @@ public final class BRouterResponseParser {
   }
 
   public RouteLeg parse(String geoJson) {
+    return parse(geoJson, Activity.MTB);
+  }
+
+  /** As {@link #parse(String)}; warnings use the access rules of the activity. */
+  public RouteLeg parse(String geoJson, Activity activity) {
     JsonNode feature;
     try {
       feature = mapper.readTree(geoJson).path("features").path(0);
@@ -43,7 +48,8 @@ public final class BRouterResponseParser {
     double distance = props.path("track-length").asDouble(0);
     double ascent = props.path("filtered ascend").asDouble(0);
     JsonNode messages = props.path("messages");
-    return new RouteLeg(points, distance, ascent, breakdown(messages), warnings(messages));
+    return new RouteLeg(
+        points, distance, ascent, breakdown(messages), warnings(messages, activity));
   }
 
   /**
@@ -83,7 +89,7 @@ public final class BRouterResponseParser {
    * Restricted ways on the leg (only forced legs can use them), one warning per stretch with the
    * same reason, placed where that stretch ends.
    */
-  private static List<RouteWarning> warnings(JsonNode messages) {
+  private static List<RouteWarning> warnings(JsonNode messages, Activity activity) {
     List<RouteWarning> warnings = new ArrayList<>();
     if (!messages.isArray() || messages.size() < 2) {
       return warnings;
@@ -98,7 +104,7 @@ public final class BRouterResponseParser {
     String previous = null;
     for (int i = 1; i < messages.size(); i++) {
       JsonNode row = messages.get(i);
-      String reason = RouteWarning.reasonFor(parseTags(row.path(tagsCol).asString("")));
+      String reason = RouteWarning.reasonFor(parseTags(row.path(tagsCol).asString("")), activity);
       if (reason != null && !reason.equals(previous)) {
         warnings.add(
             new RouteWarning(

@@ -16,7 +16,7 @@ import {
   showMtbOverlay,
   VECTOR_STYLE_URL,
 } from '@/map/layers'
-import { addTrailLayers, setTrailDifficulty, showTrails } from '@/map/trails'
+import { addTrailLayers, setTrailStyle, showTrails, type TrailStyle } from '@/map/trails'
 import { attachWayInfo } from '@/map/wayInfo'
 import { addPlaceLayers, showPlace } from '@/map/place'
 import * as planner from '@/planner'
@@ -428,7 +428,7 @@ onMounted(() => {
 
   m.on('load', () => {
     addRasterLayers(m)
-    addTrailLayers(m, planner.preferences.value.maxDifficulty)
+    addTrailLayers(m, trailStyle())
     addPlaceLayers(m)
     addRouteLayers(m, cssVar('--route'))
     showBaseMap(m, baseMap.value)
@@ -442,6 +442,7 @@ onMounted(() => {
     detachWayInfo = attachWayInfo(m, {
       enabled: () => trails.value,
       blocked: (e) => m.queryRenderedFeatures(e.point, { layers: ['route-hit'] }).length > 0,
+      activity: () => planner.preferences.value.activity,
     })
     renderRoute()
     renderMarkers()
@@ -507,10 +508,15 @@ watch(trails, (visible) => {
   localStorage.setItem('trailplan.trails', String(visible))
   if (map && ready) showTrails(map, visible)
 })
+/** The overlay follows the activity (which access counts) and the hardest grade allowed. */
+function trailStyle(): TrailStyle {
+  const { activity, maxDifficulty } = planner.preferences.value
+  return { activity, maxDifficulty }
+}
 watch(
-  () => planner.preferences.value.maxDifficulty,
-  (max) => {
-    if (map && ready) setTrailDifficulty(map, max)
+  () => [planner.preferences.value.activity, planner.preferences.value.maxDifficulty],
+  () => {
+    if (map && ready) setTrailStyle(map, trailStyle())
   },
 )
 </script>
@@ -534,7 +540,7 @@ watch(
         <input v-model="trails" type="checkbox" />
         Trails
       </label>
-      <TrailLegend v-if="trails" class="legend" />
+      <TrailLegend v-if="trails" class="legend" :activity="planner.preferences.value.activity" />
     </div>
   </div>
 </template>

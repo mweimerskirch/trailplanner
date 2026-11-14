@@ -46,6 +46,14 @@ describe('describeWay', () => {
     expect(info).toEqual({ title: 'Track', type: null, rows: [{ label: 'Access', value: 'private' }] })
   })
 
+  it('leaves out bike access when planning for horses', () => {
+    const props = { class: 'path', subclass: 'bridleway', bicycle: 'no', access: 'private' }
+    const labels = (activity?: 'MTB' | 'HORSE') =>
+      describeWay(props, null, activity)?.rows.map((r) => r.label)
+    expect(labels()).toEqual(['Bikes', 'Access'])
+    expect(labels('HORSE')).toEqual(['Access'])
+  })
+
   it('escapes names in the HTML', () => {
     const info = describeWay({ class: 'minor' }, '<b>Rue</b>')
     expect(info && wayInfoHtml(info)).toContain('&#60;b&#62;Rue')

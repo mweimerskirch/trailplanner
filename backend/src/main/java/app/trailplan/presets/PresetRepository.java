@@ -3,8 +3,11 @@ package app.trailplan.presets;
 import app.trailplan.db.Timestamps;
 import app.trailplan.routing.RoutingPreferences;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import org.springframework.jdbc.core.RowCallbackHandler;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.support.GeneratedKeyHolder;
 import org.springframework.jdbc.support.KeyHolder;
@@ -103,13 +106,24 @@ public class PresetRepository {
         == 1;
   }
 
-  /** Riders who have not received the built-in presets yet. */
-  public List<Long> ridersWithoutDefaults() {
-    return jdbc.sql("SELECT id FROM rider WHERE presets_seeded = 0").query(Long.class).list();
+  /**
+   * Riders seeded with an older version of the built-in presets than {@code current}, with the
+   * version they have (0: none yet). rider.presets_seeded holds that version.
+   */
+  public Map<Long, Integer> seededVersions(int current) {
+    Map<Long, Integer> riders = new LinkedHashMap<>();
+    jdbc.sql("SELECT id, presets_seeded FROM rider WHERE presets_seeded < :current")
+        .param("current", current)
+        .query(
+            (RowCallbackHandler) rs -> riders.put(rs.getLong("id"), rs.getInt("presets_seeded")));
+    return riders;
   }
 
-  public void markSeeded(long userId) {
-    jdbc.sql("UPDATE rider SET presets_seeded = 1 WHERE id = :user").param("user", userId).update();
+  public void markSeeded(long userId, int version) {
+    jdbc.sql("UPDATE rider SET presets_seeded = :version WHERE id = :user")
+        .param("user", userId)
+        .param("version", version)
+        .update();
   }
 
   private String write(RoutingPreferences prefs) {

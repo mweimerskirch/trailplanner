@@ -14,6 +14,7 @@ import static app.trailplan.routing.WayCategory.QUIET_ROAD;
 import static app.trailplan.routing.WayCategory.ROUGH_TRACK;
 import static app.trailplan.routing.WayCategory.TRAIL;
 
+import app.trailplan.routing.Activity;
 import app.trailplan.routing.PreferenceLevel;
 import app.trailplan.routing.RoutingPreferences;
 import app.trailplan.routing.TrailDifficulty;
@@ -22,10 +23,25 @@ import app.trailplan.routing.WoodsPreference;
 import java.util.EnumMap;
 import java.util.List;
 
-/** The presets every rider starts with. They become the rider's own (editable, deletable). */
+/**
+ * The presets every rider starts with, for each activity. They become the rider's own (editable,
+ * deletable).
+ */
 public final class DefaultPresets {
 
-  public record Preset(String name, RoutingPreferences preferences) {}
+  /**
+   * A built-in preset. {@code since} is the {@link #VERSION} that added it: riders seeded with an
+   * older version get it on the next start (rider.presets_seeded holds the version they have).
+   */
+  public record Preset(String name, RoutingPreferences preferences, int since) {
+
+    Preset(String name, RoutingPreferences preferences) {
+      this(name, preferences, 1);
+    }
+  }
+
+  /** 1: the mountain-bike presets; 2: road bike and horseback presets. */
+  public static final int VERSION = 2;
 
   private DefaultPresets() {}
 
@@ -100,7 +116,94 @@ public final class DefaultPresets {
                   FAVOURITE,
                   PREFER,
                   NEUTRAL,
-                  AVOID)));
+                  AVOID)),
+          new Preset(
+              "Quiet roads",
+              prefs(
+                  Activity.ROAD,
+                  false,
+                  NEVER,
+                  NEVER,
+                  AVOID,
+                  AVOID,
+                  PREFER,
+                  FAVOURITE,
+                  NEUTRAL,
+                  AVOID),
+              2),
+          new Preset(
+              "Fast roads",
+              prefs(
+                  Activity.ROAD,
+                  false,
+                  NEVER,
+                  NEVER,
+                  NEVER,
+                  NEVER,
+                  NEUTRAL,
+                  PREFER,
+                  FAVOURITE,
+                  NEUTRAL),
+              2),
+          new Preset(
+              "Bike paths, relaxed",
+              prefs(
+                  Activity.ROAD,
+                  true,
+                  AVOID,
+                  NEVER,
+                  NEUTRAL,
+                  NEUTRAL,
+                  FAVOURITE,
+                  PREFER,
+                  AVOID,
+                  NEVER),
+              2),
+          new Preset(
+              "Bridleways & forest",
+              prefs(
+                  Activity.HORSE,
+                  WoodsPreference.PREFER,
+                  false,
+                  FAVOURITE,
+                  FAVOURITE,
+                  PREFER,
+                  NEUTRAL,
+                  AVOID,
+                  NEUTRAL,
+                  AVOID,
+                  NEVER),
+              2),
+          new Preset(
+              "Gentle hack",
+              prefs(
+                  Activity.HORSE,
+                  WoodsPreference.INDIFFERENT,
+                  true,
+                  PREFER,
+                  PREFER,
+                  FAVOURITE,
+                  NEUTRAL,
+                  AVOID,
+                  PREFER,
+                  AVOID,
+                  NEVER),
+              2),
+          new Preset(
+              "Direct",
+              prefs(
+                  Activity.HORSE,
+                  WoodsPreference.INDIFFERENT,
+                  false,
+                  PREFER,
+                  PREFER,
+                  PREFER,
+                  NEUTRAL,
+                  NEUTRAL,
+                  PREFER,
+                  NEUTRAL,
+                  AVOID),
+              2));
 
   /**
    * Levels in the order trail, rough track, gravel track, footway, cycleway, quiet road, main road,
@@ -111,6 +214,23 @@ public final class DefaultPresets {
       WoodsPreference woods,
       boolean avoidClimbs,
       PreferenceLevel... levels) {
+    return new RoutingPreferences(levels(levels), difficulty, woods, avoidClimbs, Activity.MTB);
+  }
+
+  /** Road bike: no trail difficulty or woods (they do not apply). Levels as above. */
+  private static RoutingPreferences prefs(
+      Activity activity, boolean avoidClimbs, PreferenceLevel... levels) {
+    return prefs(activity, WoodsPreference.INDIFFERENT, avoidClimbs, levels);
+  }
+
+  /** Other activities: the trail difficulty does not apply. Levels as above. */
+  private static RoutingPreferences prefs(
+      Activity activity, WoodsPreference woods, boolean avoidClimbs, PreferenceLevel... levels) {
+    return new RoutingPreferences(
+        levels(levels), TrailDifficulty.ANY, woods, avoidClimbs, activity);
+  }
+
+  private static EnumMap<WayCategory, PreferenceLevel> levels(PreferenceLevel... levels) {
     WayCategory[] order = {
       TRAIL, ROUGH_TRACK, GRAVEL_TRACK, FOOTWAY, CYCLEWAY, QUIET_ROAD, MAIN_ROAD, BUSY_ROAD
     };
@@ -118,6 +238,6 @@ public final class DefaultPresets {
     for (int i = 0; i < order.length; i++) {
       map.put(order[i], levels[i]);
     }
-    return new RoutingPreferences(map, difficulty, woods, avoidClimbs);
+    return map;
   }
 }

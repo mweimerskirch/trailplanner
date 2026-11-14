@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { CATEGORIES, OTHER_WAYS, SURFACES } from '@/constants'
+import { CATEGORIES, categoryText, OTHER_WAYS, SURFACES } from '@/constants'
 import * as planner from '@/planner'
 import BreakdownBar, { type BreakdownItem } from '@/components/molecules/BreakdownBar.vue'
 import StatTile from '@/components/molecules/StatTile.vue'
@@ -13,7 +13,7 @@ const time = computed(() => {
 
 const wayTypes = computed<BreakdownItem[]>(() => [
   ...CATEGORIES.map((c) => ({
-    label: c.label,
+    label: categoryText(c, planner.preferences.value.activity).label,
     color: c.color,
     metres: planner.breakdown.value.wayTypes[c.key] ?? 0,
   })),
@@ -49,8 +49,8 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
         <input
           v-model.number="planner.speed.value"
           type="number"
-          min="5"
-          max="40"
+          min="3"
+          max="50"
           step="1"
           aria-label="Average speed on the flat in km/h"
         />

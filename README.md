@@ -1,11 +1,13 @@
 # Trailplan
 
 A self-hosted mountain-bike route planner on OpenStreetMap data, for planning rides on a Wahoo
-ELEMNT BOLT.
+ELEMNT BOLT. It also plans road-bike rides and horseback rides.
 
 - Click the map to set points, drag points to move them, drag the route line to add a via point.
 - Routing prefers the way types you choose (singletrails, forest tracks, roads …), respects a
   maximum trail difficulty (`mtb:scale`) and can prefer riding through woods.
+- Activities: mountain bike, road bike (paved ways only) and horseback (horse access, no steps or
+  stiles, soft ground preferred). Each has its own presets and average speed.
 - "Trails" map overlay on any base map: paths and tracks from OpenStreetMap coloured by difficulty
   (mtb:scale S0 green, S1 blue, S2 red, S3+ black), unrated ones dashed brown, ways closed to bikes
   dotted grey. Trails harder than the riding style allows are faded. Pointing at a path or road
@@ -133,6 +135,19 @@ gets a cost factor: Favourite 1, Prefer 1.5, Neutral 2.5, Avoid 6, Never 10000 (
 above the chosen `mtb:scale`, against the direction of one-ways, or closed to bikes are blocked.
 With “prefer woods”, ways outside forest (BRouter's `estimated_forest_class`) cost 1.5× or 2.2× more.
 
+The activity changes the rules on top of that:
+
+- Road bike: rough surfaces (gravel, dirt, grass …), bad smoothness, tracks without a surface or a
+  solid grade, and any trail with an `mtb:scale` are blocked. Compacted and fine gravel cost 3×,
+  cobbles extra. Paths with `bicycle=designated` count as cycleways. Busy roads by BRouter's traffic
+  estimate cost a little more. Woods do not count.
+- Horseback: `horse=` decides access instead of `bicycle=`. Footways and cycleways are used only
+  where horses are allowed. Trunk roads, steps and paths from `sac_scale=demanding_mountain_hiking`
+  up are blocked; stiles, kissing gates, turnstiles and cattle grids are impassable unless tagged
+  for horses. Asphalt costs 1.3×, setts and cobbles 1.6×. OpenStreetMap's horse tagging is patchier
+  than its bike tagging, and the map tiles have no horse access, so the trail overlay shows only
+  general access in this mode.
+
 Profiles are written to the shared `customprofiles` directory, named by a hash of their content, and
 requested as `custom_tp_<hash>`. Each leg between two points is routed and cached separately, so
 moving one point recalculates only its two legs.
@@ -145,7 +160,8 @@ moving one point recalculates only its two legs.
   resolves custom profiles against the main profile directory, so an absolute path would be looked
   up as `/profiles2/customprofiles/…` and fail.
 - BRouter rejects profiles that mention tag values not in its `lookups.dat`. The generator only uses
-  known values (see `MTB_SCALE_VALUES`).
+  known values (see `MTB_SCALE_VALUES`). Aliases are not accepted either: `horse=permissive` is
+  folded into `yes`, so the profile must say `horse=yes`.
 
 ## What has been tested
 

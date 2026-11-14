@@ -2,6 +2,7 @@ import * as maplibregl from 'maplibre-gl'
 import type { GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature, MapMouseEvent } from 'maplibre-gl'
 
 type Position = number[]
+import type { Activity } from '@/types'
 import { TRAIL_COLORS } from './trails'
 
 /**
@@ -88,7 +89,7 @@ export function gradeColor(grade: number): string {
 }
 
 /** What to show for a way, or null if the feature is not a way. */
-export function describeWay(props: Props, name: string | null): WayInfo | null {
+export function describeWay(props: Props, name: string | null, activity: Activity = 'MTB'): WayInfo | null {
   const type = wayType(props)
   if (!type) return null
   const rows: WayInfo['rows'] = []
@@ -104,7 +105,8 @@ export function describeWay(props: Props, name: string | null): WayInfo | null {
   const surface = text(props.surface)
   if (surface) rows.push({ label: 'Surface', value: surface })
   const bicycle = text(props.bicycle)
-  if (bicycle) rows.push({ label: 'Bikes', value: BIKE_LABELS[bicycle] ?? bicycle })
+  // The tiles have no horse tag; bike access says nothing about horses.
+  if (bicycle && activity !== 'HORSE') rows.push({ label: 'Bikes', value: BIKE_LABELS[bicycle] ?? bicycle })
   const access = text(props.access)
   if (access && access !== 'yes') rows.push({ label: 'Access', value: ACCESS_LABELS[access] ?? access })
   const brunnel = text(props.brunnel)
@@ -171,7 +173,12 @@ const TOLERANCE = 5
  */
 export function attachWayInfo(
   map: MapLibreMap,
-  options: { enabled: () => boolean; blocked?: (event: MapMouseEvent) => boolean },
+  options: {
+    enabled: () => boolean
+    blocked?: (event: MapMouseEvent) => boolean
+    /** The planned activity (default mountain bike): decides which access rows are shown. */
+    activity?: () => Activity
+  },
 ): () => void {
   if (!map.getSource(SOURCE)) return () => undefined
   // Names are in a separate tile layer; this invisible line layer makes them queryable.
@@ -263,6 +270,7 @@ export function attachWayInfo(
       info = describeWay(
         f.properties,
         named ? (text(named.properties.name) ?? text(named.properties.ref)) : null,
+        options.activity?.() ?? 'MTB',
       )
       if (!info) continue
       // The tiles merge neighbouring ways with the same attributes into one feature. Highlight

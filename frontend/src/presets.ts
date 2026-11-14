@@ -2,7 +2,7 @@ import { ref, watch } from 'vue'
 import { api } from './api'
 import { mergePreferences } from './planner'
 import { currentRider } from './session'
-import type { Preset, RoutingPreferences } from './types'
+import type { Activity, Preset, RoutingPreferences } from './types'
 
 /** The chosen rider's riding-style presets, in their order. Reloaded when the rider changes. */
 export const presets = ref<Preset[]>([])
@@ -26,11 +26,16 @@ function key(prefs: Partial<RoutingPreferences>): string {
     .sort()
     .map((k) => `${k}=${p.levels[k as keyof typeof p.levels]}`)
     .join(',')
-  return `${levels}|${p.maxDifficulty}|${p.woods}|${String(p.avoidClimbs)}`
+  return `${p.activity}|${levels}|${p.maxDifficulty}|${p.woods}|${String(p.avoidClimbs)}`
 }
 
 /** The preset whose preferences are exactly these, if any. */
 export function matchingPreset(prefs: RoutingPreferences): Preset | undefined {
   const k = key(prefs)
   return presets.value.find((p) => key(p.preferences) === k)
+}
+
+/** The presets for one activity (presets saved before activities existed are mountain-bike ones). */
+export function presetsFor(activity: Activity): Preset[] {
+  return presets.value.filter((p) => mergePreferences(p.preferences).activity === activity)
 }

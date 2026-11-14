@@ -7,12 +7,15 @@ export type PreferenceLevel = 'NEVER' | 'AVOID' | 'NEUTRAL' | 'PREFER' | 'FAVOUR
 export type TrailDifficulty = 'S0' | 'S1' | 'S2' | 'S3' | 'S4' | 'S5' | 'ANY'
 export type WoodsPreference = 'INDIFFERENT' | 'PREFER' | 'STRONGLY_PREFER'
 export type Surface = 'PAVED' | 'UNPAVED' | 'UNKNOWN'
+/** What a route is planned for (routing.Activity): access rules and surfaces depend on it. */
+export type Activity = 'MTB' | 'ROAD' | 'HORSE'
 
 export interface RoutingPreferences {
   levels: Record<WayCategory, PreferenceLevel>
   maxDifficulty: TrailDifficulty
   woods: WoodsPreference
   avoidClimbs: boolean
+  activity: Activity
 }
 
 export interface GeoPoint {

@@ -38,7 +38,7 @@ public class RoutingService {
     }
     String profileId = profiles.profileIdFor(preferences, type == LegType.FORCED);
     String key = profileId + "|" + from.key() + "|" + to.key();
-    return cache.get(key, () -> client.route(from, to, profileId));
+    return cache.get(key, () -> client.route(from, to, profileId, preferences.activity()));
   }
 
   /** A leg drawn as a straight line: no router involved, way type and elevation unknown. */

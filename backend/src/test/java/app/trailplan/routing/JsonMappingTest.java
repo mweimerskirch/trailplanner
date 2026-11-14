@@ -33,6 +33,9 @@ class JsonMappingTest {
     assertThat(prefs.level(WayCategory.BUSY_ROAD)).isEqualTo(WayCategory.BUSY_ROAD.defaultLevel());
     assertThat(prefs.maxDifficulty()).isEqualTo(TrailDifficulty.S3);
     assertThat(prefs.avoidClimbs()).isTrue();
+    assertThat(prefs.activity()).isEqualTo(Activity.MTB);
+    assertThat(json.readValue("{\"activity\":\"HORSE\"}", RoutingPreferences.class).activity())
+        .isEqualTo(Activity.HORSE);
   }
 
   @Test

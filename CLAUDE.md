@@ -32,9 +32,13 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   controller parameter (401 with reason `NO_USER` if missing). Every route query must be scoped
   to the rider (`RouteRepository` methods take `userId`).
 - Riding-style presets are per rider. The built-in ones are defined only in
-  `presets.DefaultPresets`; riders get them once (`rider.presets_seeded`).
-- BRouter rejects profiles that use tag values missing from its `lookups.dat`. Check
-  `MTB_SCALE_VALUES` in `BRouterProfileGenerator` when upgrading BRouter.
+  `presets.DefaultPresets`; riders get each one once. `rider.presets_seeded` holds the
+  `DefaultPresets.VERSION` a rider has; a new built-in preset gets the next version as `since`.
+- Preferences have an `activity` (MTB, ROAD, HORSE; missing means MTB). Mountain-bike profiles must
+  stay unchanged when adding rules for the other activities (`BRouterProfileGeneratorTest`).
+- BRouter rejects profiles that use tag values missing from its `lookups.dat`, including aliases
+  (e.g. `horse=permissive` is folded into `yes`). Check `MTB_SCALE_VALUES` in
+  `BRouterProfileGenerator` when upgrading BRouter, and route a test leg with each activity.
 
 ## Frontend structure
 

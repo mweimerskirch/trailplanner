@@ -2,10 +2,19 @@
 import { computed, nextTick, ref, toRaw, useTemplateRef } from 'vue'
 import { api } from '@/api'
 import { askConfirm } from '@/confirm'
-import { CATEGORIES, DIFFICULTIES, LEVEL_LABELS, LEVELS, WOODS_OPTIONS } from '@/constants'
+import {
+  ACTIVITIES,
+  categoriesFor,
+  categoryText,
+  DEFAULT_PREFERENCES,
+  DIFFICULTIES,
+  LEVEL_LABELS,
+  LEVELS,
+  WOODS_OPTIONS,
+} from '@/constants'
 import { mergePreferences, preferences, setStatus } from '@/planner'
-import { loadPresets, matchingPreset, presets } from '@/presets'
-import type { PreferenceLevel, Preset, WayCategory } from '@/types'
+import { loadPresets, matchingPreset, presets, presetsFor } from '@/presets'
+import type { Activity, PreferenceLevel, Preset, WayCategory } from '@/types'
 
 /**
  * Riding style: how the route is calculated. Compact by default (a preset and a one-line
@@ -20,6 +29,10 @@ const naming = ref(false)
 /** The preset last chosen, so "Update" knows which one to overwrite after adjustments. */
 const basePresetId = ref<number | null>(null)
 
+const activity = computed(() => preferences.value.activity)
+/** The presets of the current activity, in the rider's order. */
+const shown = computed(() => presetsFor(activity.value))
+const categories = computed(() => categoriesFor(activity.value))
 const current = computed(() => matchingPreset(preferences.value))
 const base = computed(() => presets.value.find((p) => p.id === basePresetId.value))
 
@@ -34,13 +47,16 @@ const selected = computed({
 
 const summary = computed(() => {
   const p = preferences.value
-  const parts = [p.maxDifficulty === 'ANY' ? 'any difficulty' : `${p.maxDifficulty} max`]
-  if (p.woods === 'PREFER') parts.push('prefers woods')
-  if (p.woods === 'STRONGLY_PREFER') parts.push('strongly prefers woods')
+  const parts: string[] = []
+  if (p.activity === 'MTB')
+    parts.push(p.maxDifficulty === 'ANY' ? 'any difficulty' : `${p.maxDifficulty} max`)
+  if (p.activity === 'ROAD') parts.push('paved ways only')
+  if (p.activity !== 'ROAD' && p.woods === 'PREFER') parts.push('prefers woods')
+  if (p.activity !== 'ROAD' && p.woods === 'STRONGLY_PREFER') parts.push('strongly prefers woods')
   if (p.avoidClimbs) parts.push('avoids steep climbs')
-  const favourites = CATEGORIES.filter((c) => p.levels[c.key] === 'FAVOURITE').map((c) =>
-    c.label.toLowerCase(),
-  )
+  const favourites = categories.value
+    .filter((c) => p.levels[c.key] === 'FAVOURITE')
+    .map((c) => categoryText(c, p.activity).label.toLowerCase())
   if (favourites.length) parts.push(`loves ${favourites.join(', ')}`)
   return parts.join(' · ')
 })
@@ -49,6 +65,18 @@ function apply(preset: Preset) {
   // A plain copy: presets are reactive, so the preset itself must not be edited by the sliders.
   preferences.value = mergePreferences(structuredClone(toRaw(preset.preferences)))
   basePresetId.value = preset.id
+}
+
+/** Switching activity starts from its first preset (or the defaults if the rider deleted them all). */
+function setActivity(value: Activity) {
+  if (value === activity.value) return
+  const first = presetsFor(value)[0]
+  if (first) {
+    apply(first)
+  } else {
+    preferences.value = mergePreferences({ ...structuredClone(DEFAULT_PREFERENCES), activity: value })
+    basePresetId.value = null
+  }
 }
 
 function levelIndex(category: WayCategory): number {
@@ -114,10 +142,23 @@ const remove = (preset: Preset) =>
 <template>
   <section aria-labelledby="prefs-heading">
     <h2 id="prefs-heading">Riding style</h2>
+    <div class="activities" role="radiogroup" aria-label="Activity">
+      <button
+        v-for="a in ACTIVITIES"
+        :key="a.value"
+        type="button"
+        role="radio"
+        :aria-checked="activity === a.value"
+        :class="{ active: activity === a.value }"
+        @click="setActivity(a.value)"
+      >
+        {{ a.label }}
+      </button>
+    </div>
     <div class="row">
       <label class="visually-hidden" for="preset">Preset</label>
       <select id="preset" v-model="selected" class="grow">
-        <option v-for="p in presets" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
+        <option v-for="p in shown" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
         <option v-if="!current" value="custom" disabled>
           {{ base ? `Custom (based on ${base.name})` : 'Custom' }}
         </option>
@@ -129,12 +170,18 @@ const remove = (preset: Preset) =>
     <p class="summary">{{ summary }}</p>
 
     <div v-if="open" id="prefs-details" class="details">
-      <div v-for="c in CATEGORIES" :key="c.key" class="pref">
-        <label :for="`level-${c.key}`">{{ c.label }}</label>
+      <p v-if="activity === 'ROAD'" class="note">
+        Unpaved and rough surfaces are always avoided; compacted gravel only for short stretches.
+      </p>
+      <p v-else-if="activity === 'HORSE'" class="note">
+        Follows horse access in OpenStreetMap. Steps, stiles and kissing gates are never used.
+      </p>
+      <div v-for="c in categories" :key="c.key" class="pref">
+        <label :for="`level-${c.key}`">{{ categoryText(c, activity).label }}</label>
         <output :for="`level-${c.key}`" :class="`level-${preferences.levels[c.key].toLowerCase()}`">
           {{ LEVEL_LABELS[preferences.levels[c.key]] }}
         </output>
-        <small>{{ c.hint }}</small>
+        <small>{{ categoryText(c, activity).hint }}</small>
         <input
           :id="`level-${c.key}`"
           type="range"
@@ -147,14 +194,14 @@ const remove = (preset: Preset) =>
         />
       </div>
 
-      <div class="field">
+      <div v-if="activity === 'MTB'" class="field">
         <label for="difficulty">Hardest trail allowed</label>
         <select id="difficulty" v-model="preferences.maxDifficulty">
           <option v-for="d in DIFFICULTIES" :key="d.value" :value="d.value">{{ d.label }}</option>
         </select>
         <small>Only applies where trails are tagged with a difficulty (mtb:scale).</small>
       </div>
-      <div class="field">
+      <div v-if="activity !== 'ROAD'" class="field">
         <label for="woods">Woods</label>
         <select id="woods" v-model="preferences.woods">
           <option v-for="w in WOODS_OPTIONS" :key="w.value" :value="w.value">{{ w.label }}</option>
@@ -193,6 +240,26 @@ const remove = (preset: Preset) =>
 </template>
 
 <style scoped>
+.activities {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.activities button {
+  flex: 1;
+  padding: 5px 4px;
+  font-size: 13px;
+}
+.activities button.active {
+  background: var(--moss);
+  border-color: var(--moss);
+  color: #fff;
+}
+.note {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 12.5px;
+}
 .grow {
   flex: 1;
   min-width: 0;

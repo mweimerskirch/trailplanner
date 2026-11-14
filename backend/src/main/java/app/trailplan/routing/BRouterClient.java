@@ -17,6 +17,11 @@ public final class BRouterClient {
   }
 
   public RouteLeg route(GeoPoint from, GeoPoint to, String profileId) {
+    return route(from, to, profileId, Activity.MTB);
+  }
+
+  /** As {@link #route(GeoPoint, GeoPoint, String)}; warnings follow the activity's rules. */
+  public RouteLeg route(GeoPoint from, GeoPoint to, String profileId, Activity activity) {
     String body;
     try {
       body =
@@ -42,7 +47,7 @@ public final class BRouterClient {
       // BRouter sometimes reports errors as plain text with a 200 status.
       throw fromRouterMessage(body == null ? "" : body, null);
     }
-    return parser.parse(body);
+    return parser.parse(body, activity);
   }
 
   static RoutingException fromRouterMessage(String message, Throwable cause) {

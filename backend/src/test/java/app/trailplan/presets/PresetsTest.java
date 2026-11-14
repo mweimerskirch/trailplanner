@@ -43,6 +43,11 @@ class PresetsTest {
         .contains("\"name\":\"Fast connection\"");
     assertThat(presets.indexOf("Flowy trails")).isLessThan(presets.indexOf("Fast connection"));
     assertThat(presets).contains("\"maxDifficulty\":\"S2\"").contains("\"avoidClimbs\":true");
+    assertThat(presets)
+        .contains("\"name\":\"Quiet roads\"")
+        .contains("\"name\":\"Bridleways & forest\"")
+        .contains("\"activity\":\"ROAD\"")
+        .contains("\"activity\":\"HORSE\"");
   }
 
   @Test
@@ -54,7 +59,9 @@ class PresetsTest {
 
     var created = http.send("POST", "/api/presets", body.formatted("Evening loop"));
     assertThat(created.statusCode()).isEqualTo(201);
-    assertThat(created.body()).contains("\"TRAIL\":\"NEVER\"").contains("\"position\":6");
+    assertThat(created.body())
+        .contains("\"TRAIL\":\"NEVER\"")
+        .contains("\"position\":" + (DefaultPresets.ALL.size() + 1));
     long id = Long.parseLong(created.body().replaceAll(".*?\"id\":(\\d+).*", "$1"));
 
     assertThat(http.send("POST", "/api/presets", body.formatted("Technical")).body())
@@ -89,5 +96,38 @@ class PresetsTest {
     repository.delete(veteran, repository.findAll(veteran).getFirst().id());
     service.seedMissing(); // e.g. the next start
     assertThat(repository.findAll(veteran)).hasSize(DefaultPresets.ALL.size() - 1);
+  }
+
+  @Test
+  void ridersSeededBeforeTheRoadAndHorsePresetsGetOnlyThose() {
+    // A rider who got the mountain-bike presets (version 1) and renamed one of them.
+    jdbc.sql(
+            "INSERT INTO rider (name, created_at, presets_seeded) VALUES ('Early', '2026-01-01T00:00:00.000Z', 0)")
+        .update();
+    long early = jdbc.sql("SELECT id FROM rider WHERE name = 'Early'").query(Long.class).single();
+    service.seed(early, 0);
+    jdbc.sql("UPDATE rider SET presets_seeded = 1 WHERE id = :id").param("id", early).update();
+    Preset flowy = repository.findAll(early).getFirst();
+    repository.update(early, flowy.id(), "My trails", flowy.preferences(), java.time.Instant.EPOCH);
+    for (DefaultPresets.Preset p : DefaultPresets.ALL) {
+      if (p.since() > 1) {
+        repository.delete(
+            early,
+            repository.findAll(early).stream()
+                .filter(x -> x.name().equals(p.name()))
+                .findFirst()
+                .orElseThrow()
+                .id());
+      }
+    }
+    int mtbPresets = repository.findAll(early).size();
+
+    service.seedMissing();
+
+    var names = repository.findAll(early).stream().map(Preset::name).toList();
+    assertThat(names)
+        .contains("My trails", "Quiet roads", "Gentle hack")
+        .doesNotContain("Flowy trails");
+    assertThat(names).hasSize(mtbPresets + 6);
   }
 }
