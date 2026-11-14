@@ -1,4 +1,4 @@
-# Trailplan
+# Trail Planner
 
 A self-hosted mountain-bike route planner on OpenStreetMap data, for planning rides on a Wahoo
 ELEMNT BOLT. It also plans road-bike rides and horseback rides.
@@ -32,33 +32,37 @@ browser ──► web (nginx + Vue/MapLibre) ──/api──► backend (Spring
 Requirements: Docker with Compose, about 1 GB of disk for the map data.
 
 ```sh
-cp .env.example .env                # optional, defaults are fine for local use
+cp .env.example .env                # then set TRAILPLANNER_AREA to where you ride
 ./run.sh                            # downloads map data on first run, builds, starts, waits
 ```
 
 `./run.sh stop` stops it, `./run.sh logs` follows the logs, `./run.sh status` lists the containers.
-Without the script: `./scripts/download-segments.sh` (BRouter data for Luxembourg and the Greater
-Region), then `docker compose up -d --build`.
+Without the script: `./scripts/download-segments.sh` (BRouter data around `TRAILPLANNER_AREA`),
+then `docker compose up -d --build`.
 
 Open <http://localhost:8080>.
 
 Map data is updated weekly on brouter.de. Re-run `./scripts/download-segments.sh` (it only downloads
 changed tiles) and `docker compose restart brouter`.
 
-To cover other areas, pass tile names: `./scripts/download-segments.sh E5_N45 E10_N45`. A tile covers
-5×5 degrees; `E5_N45` is 5–10° east, 45–50° north.
+**Your area.** Set `TRAILPLANNER_AREA` in `.env` to `latitude,longitude` or
+`latitude,longitude,zoom`, e.g. `46.95,7.45,11` (without it, Luxembourg). New visitors' map opens
+there, and `./scripts/download-segments.sh` downloads the routing data within about 100 km of it.
+Routing only works where the data is downloaded. For a larger area, pass tile names:
+`./scripts/download-segments.sh E5_N45 E10_N45`. A tile covers 5×5 degrees; `E5_N45` is 5–10° east,
+45–50° north. Restart with `docker compose up -d` after changing `.env`.
 
 **Riders.** On first start you add riders (just names). Each rider has their own library, trash,
 imports, presets and planner state; the chosen rider is remembered per browser.
 
-> **No login.** Riders have no passwords and Trailplan has no authentication: everyone who can reach
+> **No login.** Riders have no passwords and Trail Planner has no authentication: everyone who can reach
 > it can open every rider's library. Run it on your own machine or
 > home network. If you expose it to the internet, put it behind a reverse proxy with authentication.
 
 ## Getting routes onto the BOLT
 
 **Sync over USB (recommended).** Switch the BOLT on, connect it with a USB data cable to the computer
-that runs Trailplan, and choose **Sync to ELEMNT** in the library. The BOLT's `routes` folder then
+that runs Trail Planner, and choose **Sync to ELEMNT** in the library. The BOLT's `routes` folder then
 holds exactly your active routes (not archived, not in the trash) as GPX files: new and changed
 routes are copied, unchanged ones are skipped. Files in the folder that are not active routes (for
 example archived routes, or files from other apps) are listed and deleted only if you confirm. The
@@ -72,9 +76,9 @@ Changed routes replace the BOLT's copy (same file name).
   or on a headless server, add a udev rule that makes the device accessible, e.g.
   `SUBSYSTEM=="usb", ATTR{idVendor}=="05c6", ATTR{idProduct}=="9039", MODE="0666"` (the BOLT V2;
   check yours with `lsusb`) in `/etc/udev/rules.d/70-elemnt.rules`.
-- The USB part is a small C helper on libmtp (`backend/mtp/trailplan-mtp.c`), built into the backend
+- The USB part is a small C helper on libmtp (`backend/mtp/trailplanner-mtp.c`), built into the backend
   image. To run the backend outside Docker, build it with `libmtp-dev` installed:
-  `gcc -O2 -o ~/.local/bin/trailplan-mtp backend/mtp/trailplan-mtp.c $(pkg-config --cflags --libs libmtp)`.
+  `gcc -O2 -o ~/.local/bin/trailplanner-mtp backend/mtp/trailplanner-mtp.c $(pkg-config --cflags --libs libmtp)`.
 
 **Copy by hand.** Copy a downloaded GPX into the device's `routes` folder:
 
@@ -92,11 +96,11 @@ the ELEMNT app; it syncs the route to the BOLT.
 
 The BOLT keeps every recorded ride as a FIT file in its `exports` folder. On the **Rides** page,
 **Import from ELEMNT** (BOLT connected over USB, as for the sync) imports the rides that are not in
-Trailplan yet. Files are recognised by name and size, so later imports only download new rides.
+Trail Planner yet. Files are recognised by name and size, so later imports only download new rides.
 Recordings without a GPS track (e.g. started by accident) are skipped. **Import FIT files…** takes
 FIT files from other devices or apps.
 
-Times are shown in the local time where the ride was recorded. Deleting a ride in Trailplan does not
+Times are shown in the local time where the ride was recorded. Deleting a ride in Trail Planner does not
 touch the device, and importing from the device does not bring it back; uploading its FIT file does.
 
 ## Development
@@ -188,3 +192,7 @@ Map data © OpenStreetMap contributors (ODbL). Routing: [BRouter](https://github
 (MIT). Base map: [OpenFreeMap](https://openfreemap.org); raster maps: CyclOSM, OpenTopoMap, Esri World
 Imagery; MTB overlay: Waymarked Trails; trail overlay: drawn from the OpenFreeMap vector tiles.
 Respect each tile provider's usage policy; for heavy use, host your own tiles.
+
+## License
+
+MIT, see [LICENSE](LICENSE). Map data and tiles have their own licences (see Credits).

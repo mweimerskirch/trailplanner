@@ -1,13 +1,13 @@
 import type {
   ConversionResult,
-  LegType,
+  DeviceImportResult,
   DeviceInfo,
   GeoPoint,
   ImportResult,
   KomootStatus,
   KomootTour,
+  LegType,
   Preset,
-  DeviceImportResult,
   RideDetails,
   RideImportResult,
   RideSummary,
@@ -18,6 +18,7 @@ import type {
   RouteLeg,
   RouteSummary,
   RoutingPreferences,
+  Settings,
   SyncPlan,
   SyncResult,
 } from './types'
@@ -74,8 +75,8 @@ export function setApiRider(id: number | null) {
 async function send(path: string, init: RequestInit = {}, signal?: AbortSignal): Promise<Response> {
   const headers = new Headers(init.headers)
   // The server only accepts changes with this header (protection against other websites).
-  headers.set('X-Trailplan-Client', 'web')
-  if (riderHeader !== null) headers.set('X-Trailplan-Rider', riderHeader)
+  headers.set('X-TrailPlanner-Client', 'web')
+  if (riderHeader !== null) headers.set('X-TrailPlanner-Rider', riderHeader)
   // The server localises its texts (device instructions, built-in presets of a new rider).
   headers.set('Accept-Language', currentLocale())
   // FormData bodies (file uploads) need the browser's multipart Content-Type with its boundary.
@@ -279,6 +280,10 @@ export const api = {
   /** Imports the rides on the connected device that are not imported yet. */
   importRidesFromDevice(deviceId: string) {
     return json<DeviceImportResult>(`/api/rides/device/${deviceId}`, { method: 'POST' })
+  },
+
+  settings() {
+    return json<Settings>('/api/settings')
   },
 
   presets() {

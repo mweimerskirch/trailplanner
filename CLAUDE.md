@@ -1,4 +1,4 @@
-# Trailplan
+# Trail Planner
 
 Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot backend with SQLite
 (`backend/`), BRouter routing server (`brouter/`). See `README.md` for architecture and setup.
@@ -8,6 +8,11 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 - Commit after every change, with a descriptive message. Do not push unless asked.
 - Never delete or overwrite `data/`. It holds the user's downloaded map tiles and the route database
   (`data/db/trailplan.db`), which are not in git. Test against a copy, or stop and ask first.
+
+- The app was called "Trailplan" before. Keep these old names: renaming them would lose data or
+  reset every browser. They are the database file `trailplan.db`, the Flyway migrations, the rider
+  cookie `trailplan_user` and the `trailplan.*` localStorage keys. Everything else says
+  "Trail Planner" or `trailplanner`.
 
 ## Checks
 
@@ -47,6 +52,9 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   back to the English in the code. Route warnings carry a `code` the UI translates.
   A built-in preset keeps its DefaultPresets name in `preset.builtin` and is shown in the UI
   language until the rider renames it.
+- `TRAILPLANNER_AREA` ("lat,lng[,zoom]", `config.StartArea`) is where the map opens without a saved
+  view (`GET /api/settings`, no rider needed) and which tiles `scripts/download-segments.sh`
+  downloads. Keep examples and tests free of the user's own places, devices and rides.
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`, including aliases
   (e.g. `horse=permissive` is folded into `yes`). Check `MTB_SCALE_VALUES` in
   `BRouterProfileGenerator` when upgrading BRouter, and route a test leg with each activity.
@@ -72,7 +80,7 @@ A component may only use components from its own level or below. Ask for confirm
   library's sync button from `GET /api/devices`, so a new device needs no frontend change.
 - USB sync: `DeviceSyncService` mirrors the rider's active routes into the device folder and
   deletes other files only when the rider confirms them by name. Device access goes through
-  `MtpDevice`; the real one (`LibmtpHelper`) runs the C helper `backend/mtp/trailplan-mtp.c`
+  `MtpDevice`; the real one (`LibmtpHelper`) runs the C helper `backend/mtp/trailplanner-mtp.c`
   (libmtp), which is built in the backend Dockerfile. Tests use a fake `MtpDevice`. Device
   tasks run one at a time through `DeviceLock`.
 - Rides: `rides.RideService` imports FIT activity files (uploaded, or from `UsbSync.ridesFolder`

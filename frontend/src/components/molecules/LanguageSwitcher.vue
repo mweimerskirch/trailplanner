@@ -18,7 +18,7 @@ const value = computed({
   <label class="language">
     <span class="visually-hidden">{{ t('common.language') }}</span>
     <select v-model="value" :title="t('common.language')">
-      <!-- Short codes keep the header narrow; Luxembourg readers know EN / FR / DE. -->
+      <!-- Short codes keep the header narrow. -->
       <option v-for="l in LOCALES" :key="l.code" :value="l.code" :lang="l.code" :title="l.name">
         {{ l.code.toUpperCase() }}
       </option>

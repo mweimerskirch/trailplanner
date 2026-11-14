@@ -1,0 +1,117 @@
+package app.trailplanner;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+import app.trailplanner.routes.RouteDraft;
+import app.trailplanner.routes.RouteRepository;
+import app.trailplanner.routing.LegBreakdown;
+import app.trailplanner.routing.PlannedRoute;
+import app.trailplanner.routing.RoutingPreferences;
+import app.trailplanner.routing.TrackPoint;
+import app.trailplanner.routing.Waypoint;
+import java.io.IOException;
+import java.net.http.HttpResponse;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.time.Instant;
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
+
+/**
+ * Starts the whole application on a throw-away SQLite database (no BRouter needed) and checks the
+ * JSON the frontend relies on. Catches wiring and serialization changes on framework upgrades.
+ */
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+class ApplicationSmokeTest {
+
+  @DynamicPropertySource
+  static void isolatedStorage(DynamicPropertyRegistry registry) throws IOException {
+    Path dir = Files.createTempDirectory("trailplanner-test");
+    registry.add("spring.datasource.url", () -> "jdbc:sqlite:" + dir.resolve("test.db"));
+    registry.add(
+        "trailplanner.router.custom-profile-dir", () -> dir.resolve("profiles").toString());
+  }
+
+  @LocalServerPort int port;
+  @Autowired RouteRepository repository;
+
+  @Test
+  void servesDefaultPreferencesWithoutARider() throws Exception {
+    HttpResponse<String> response = new TestHttp(port).get("/api/routing/preferences/defaults");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body())
+        .contains("\"TRAIL\":\"FAVOURITE\"")
+        .contains("\"maxDifficulty\":\"S3\"")
+        .contains("\"avoidClimbs\":false");
+  }
+
+  @Test
+  void servesTheStartAreaWithoutARider() throws Exception {
+    HttpResponse<String> response = new TestHttp(port).get("/api/settings");
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body()).isEqualTo("{\"area\":{\"lat\":49.61,\"lng\":6.13,\"zoom\":10.0}}");
+  }
+
+  @Test
+  void savedRoutesUseIsoTimestampsAndExplicitNulls() throws Exception {
+    TestHttp http = new TestHttp(port);
+    long rider = http.chooseNewRider("Smoke");
+    List<Waypoint> waypoints = List.of(Waypoint.of(49.61, 6.13), Waypoint.of(49.62, 6.14));
+    PlannedRoute planned =
+        new PlannedRoute(
+            List.of(new TrackPoint(6.13, 49.61, 300.0), new TrackPoint(6.14, 49.62, null)),
+            1500,
+            20,
+            5,
+            LegBreakdown.empty());
+    long id =
+        repository.insert(
+            rider,
+            new RouteDraft("Smoke test", waypoints, RoutingPreferences.defaults()),
+            planned,
+            Instant.parse("2026-01-02T03:04:05Z"));
+
+    HttpResponse<String> response = http.get("/api/routes/" + id);
+
+    assertThat(response.statusCode()).isEqualTo(200);
+    assertThat(response.body())
+        .contains("\"name\":\"Smoke test\"")
+        .contains("\"updatedAt\":\"2026-01-02T03:04:05Z\"")
+        .contains("\"deletedAt\":null");
+    assertThat(http.get("/api/routes/" + id + "/export/gpx").body())
+        .contains("<trkpt lat=\"49.610000\"");
+    HttpResponse<String> fit = http.get("/api/routes/" + id + "/export/fit");
+    assertThat(fit.headers().firstValue("Content-Disposition"))
+        .hasValueSatisfying(v -> assertThat(v).contains("Smoke_test.fit"));
+    assertThat(fit.body().substring(8, 12)).isEqualTo(".FIT");
+    assertThat(http.get("/api/routes/" + id + "/export/kml").statusCode()).isEqualTo(400);
+  }
+
+  @Test
+  void reportsProblemsAsProblemDetails() throws Exception {
+    TestHttp http = new TestHttp(port);
+
+    HttpResponse<String> noRider = http.get("/api/routes");
+    assertThat(noRider.statusCode()).isEqualTo(401);
+    assertThat(noRider.body()).contains("\"reason\":\"NO_USER\"");
+
+    http.chooseNewRider("Problems");
+    HttpResponse<String> missing = http.get("/api/routes/999999");
+    assertThat(missing.statusCode()).isEqualTo(404);
+    assertThat(missing.body()).contains("Route 999999 does not exist.");
+
+    HttpResponse<String> invalid =
+        http.send(
+            "POST",
+            "/api/routing/leg",
+            "{\"from\":{\"lat\":91,\"lng\":6},\"to\":{\"lat\":49,\"lng\":6},\"preferences\":{}}");
+    assertThat(invalid.statusCode()).isEqualTo(400);
+  }
+}

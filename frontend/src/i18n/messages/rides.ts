@@ -34,7 +34,7 @@ export const en = {
   confirmDelete: {
     title: 'Delete “{name}”?',
     message:
-      'The ride is deleted from Trailplan, not from the device. Importing from the device will not bring it back; uploading its FIT file will.',
+      'The ride is deleted from Trail Planner, not from the device. Importing from the device will not bring it back; uploading its FIT file will.',
     confirm: 'Delete ride',
   },
   error: {
@@ -111,7 +111,7 @@ export const fr: typeof en = {
   confirmDelete: {
     title: 'Supprimer « {name} » ?',
     message:
-      'La sortie est supprimée de Trailplan, pas de l’appareil. Une importation depuis l’appareil ne la fera pas revenir ; l’envoi de son fichier FIT, si.',
+      'La sortie est supprimée de Trail Planner, pas de l’appareil. Une importation depuis l’appareil ne la fera pas revenir ; l’envoi de son fichier FIT, si.',
     confirm: 'Supprimer la sortie',
   },
   error: {
@@ -189,7 +189,7 @@ export const de: typeof en = {
   confirmDelete: {
     title: '„{name}“ löschen?',
     message:
-      'Die Fahrt wird in Trailplan gelöscht, nicht auf dem Gerät. Ein Import vom Gerät holt sie nicht zurück, das Hochladen ihrer FIT-Datei schon.',
+      'Die Fahrt wird in Trail Planner gelöscht, nicht auf dem Gerät. Ein Import vom Gerät holt sie nicht zurück, das Hochladen ihrer FIT-Datei schon.',
     confirm: 'Fahrt löschen',
   },
   error: {

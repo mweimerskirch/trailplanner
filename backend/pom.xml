@@ -11,10 +11,16 @@
     <relativePath/>
   </parent>
 
-  <groupId>app.trailplan</groupId>
-  <artifactId>trailplan-backend</artifactId>
+  <groupId>app.trailplanner</groupId>
+  <artifactId>trailplanner-backend</artifactId>
   <version>0.1.0-SNAPSHOT</version>
-  <name>Trailplan backend</name>
+  <name>Trail Planner backend</name>
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://opensource.org/license/mit</url>
+    </license>
+  </licenses>
 
   <properties>
     <java.version>25</java.version>

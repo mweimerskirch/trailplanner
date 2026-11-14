@@ -3,7 +3,7 @@
 
 export const en = {
   nav: {
-    home: 'Trailplan home',
+    home: 'Trail Planner home',
     main: 'Main',
     library: 'Library',
     planner: 'Planner',
@@ -42,7 +42,7 @@ export const en = {
   favorite: 'Favorite',
   loading: 'Loading…',
   error: {
-    unreachable: 'The Trailplan server is not reachable.',
+    unreachable: 'The Trail Planner server is not reachable.',
     requestFailed: 'Request failed ({status})',
     placeSearch: 'Place search is unavailable right now.',
   },
@@ -50,7 +50,7 @@ export const en = {
 
 export const fr: typeof en = {
   nav: {
-    home: 'Accueil Trailplan',
+    home: 'Accueil Trail Planner',
     main: 'Principal',
     library: 'Bibliothèque',
     planner: 'Planificateur',
@@ -88,7 +88,7 @@ export const fr: typeof en = {
   favorite: 'Favori',
   loading: 'Chargement…',
   error: {
-    unreachable: 'Le serveur Trailplan est injoignable.',
+    unreachable: 'Le serveur Trail Planner est injoignable.',
     requestFailed: 'La requête a échoué ({status})',
     placeSearch: 'La recherche de lieux est indisponible pour le moment.',
   },
@@ -96,7 +96,7 @@ export const fr: typeof en = {
 
 export const de: typeof en = {
   nav: {
-    home: 'Trailplan-Startseite',
+    home: 'Trail-Planner-Startseite',
     main: 'Hauptmenü',
     library: 'Bibliothek',
     planner: 'Planer',
@@ -134,7 +134,7 @@ export const de: typeof en = {
   favorite: 'Favorit',
   loading: 'Wird geladen…',
   error: {
-    unreachable: 'Der Trailplan-Server ist nicht erreichbar.',
+    unreachable: 'Der Trail-Planner-Server ist nicht erreichbar.',
     requestFailed: 'Anfrage fehlgeschlagen ({status})',
     placeSearch: 'Die Ortssuche ist gerade nicht verfügbar.',
   },

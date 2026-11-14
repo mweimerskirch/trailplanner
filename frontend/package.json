@@ -1,6 +1,7 @@
 {
-  "name": "trailplan-frontend",
+  "name": "trailplanner-frontend",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "scripts": {

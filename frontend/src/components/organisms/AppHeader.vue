@@ -24,7 +24,7 @@ const section = computed(() => {
   <header class="app-header">
     <RouterLink :to="currentRider ? '/library' : '/riders'" class="brand" :aria-label="t('common.nav.home')">
       <AppLogo />
-      <span class="name">Trailplan</span>
+      <span class="name">Trail Planner</span>
     </RouterLink>
 
     <template v-if="currentRider">

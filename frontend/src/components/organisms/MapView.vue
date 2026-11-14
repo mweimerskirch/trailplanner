@@ -6,7 +6,8 @@ import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import TrailLegend from '@/components/molecules/TrailLegend.vue'
 import { onActivated, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
 import { useI18n } from 'vue-i18n'
-import { DEFAULT_CENTER, warningText } from '@/constants'
+import { api } from '@/api'
+import { WORLD_VIEW, warningText } from '@/constants'
 import {
   addRasterLayers,
   addRouteLayers,
@@ -385,7 +386,7 @@ function fitToRoute() {
   map.fitBounds(bounds, { padding: { top: 60, bottom: 180, left: 60, right: 60 }, maxZoom: 15 })
 }
 
-function savedView(): { center: [number, number]; zoom: number } {
+function savedView(): { center: [number, number]; zoom: number } | null {
   try {
     const raw = localStorage.getItem('trailplan.view')
     if (raw) {
@@ -395,7 +396,7 @@ function savedView(): { center: [number, number]; zoom: number } {
   } catch {
     // ignore corrupt value
   }
-  return { center: DEFAULT_CENTER, zoom: 10 }
+  return null
 }
 
 const onColorSchemeChange = () => {
@@ -404,7 +405,8 @@ const onColorSchemeChange = () => {
 
 onMounted(() => {
   if (!container.value) return
-  const view = savedView()
+  const saved = savedView()
+  const view = saved ?? WORLD_VIEW
   const m = new maplibregl.Map({
     container: container.value,
     style: VECTOR_STYLE_URL,
@@ -413,6 +415,16 @@ onMounted(() => {
     attributionControl: { compact: true },
   })
   map = m
+  if (!saved) {
+    // First visit: open at the server's start area, unless a route was already shown meanwhile.
+    void api
+      .settings()
+      .then(({ area }) => {
+        if (m.getZoom() === WORLD_VIEW.zoom && !m.isMoving())
+          m.jumpTo({ center: [area.lng, area.lat], zoom: area.zoom })
+      })
+      .catch(() => undefined)
+  }
   m.addControl(new maplibregl.NavigationControl(), 'top-right')
   m.addControl(
     new maplibregl.GeolocateControl({

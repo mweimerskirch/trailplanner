@@ -1,5 +1,5 @@
 #!/bin/sh
-# Starts Trailplan in Docker and waits until the planner is reachable.
+# Starts Trail Planner in Docker and waits until the planner is reachable.
 #
 # Usage: ./run.sh          build (if needed) and start, then print the URL
 #        ./run.sh stop     stop all containers
@@ -25,30 +25,30 @@ esac
 mkdir -p data/segments4 data/customprofiles data/db
 
 if ! ls data/segments4/*.rd5 >/dev/null 2>&1; then
-  echo "No map data yet. Downloading the default tiles (about 650 MB, only needed once)…"
+  echo "No map data yet. Downloading the routing data for TRAILPLANNER_AREA (a few hundred MB, only needed once)…"
   ./scripts/download-segments.sh
 fi
 
-# Same port as docker-compose.yml: TRAILPLAN_PORT from the environment or .env, default 8080.
-port=${TRAILPLAN_PORT:-}
+# Same port as docker-compose.yml: TRAILPLANNER_PORT from the environment or .env, default 8080.
+port=${TRAILPLANNER_PORT:-}
 if [ -z "$port" ] && [ -f .env ]; then
-  port=$(sed -n 's/^TRAILPLAN_PORT=//p' .env | tail -n 1 | tr -d '"'"'"' \r')
+  port=$(sed -n 's/^TRAILPLANNER_PORT=//p' .env | tail -n 1 | tr -d '"'"'"' \r')
 fi
 port=${port:-8080}
 
 docker compose up -d --build
 
-printf 'Waiting for Trailplan to start'
+printf 'Waiting for Trail Planner to start'
 i=0
 until curl -fsS -o /dev/null "http://localhost:$port/api/routing/preferences/defaults" 2>/dev/null; do
   i=$((i + 1))
   if [ "$i" -ge 90 ]; then
     echo
-    echo "Trailplan did not answer after 3 minutes. Check the logs: $0 logs" >&2
+    echo "Trail Planner did not answer after 3 minutes. Check the logs: $0 logs" >&2
     exit 1
   fi
   printf '.'
   sleep 2
 done
 echo
-echo "Trailplan is running: http://localhost:$port   (stop with: $0 stop)"
+echo "Trail Planner is running: http://localhost:$port   (stop with: $0 stop)"

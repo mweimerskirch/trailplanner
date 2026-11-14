@@ -12,7 +12,7 @@ export const en = {
     which: 'Which routes',
     all: 'All routes',
     favorites: 'Favorites',
-    planned: 'Planned in Trailplan',
+    planned: 'Planned in Trail Planner',
     imported: 'Imported',
   },
   sort: {
@@ -105,7 +105,7 @@ export const en = {
     email: 'Komoot email',
     password: 'Password',
     signIn: 'Sign in to Komoot',
-    note: "Your password goes to Komoot only and is not stored; Trailplan keeps Komoot's session token until you sign out or close the browser. This uses Komoot's unofficial web API, which may stop working if Komoot changes it. If it does, download GPX files from komoot.com and use the Files tab.",
+    note: "Your password goes to Komoot only and is not stored; Trail Planner keeps Komoot's session token until you sign out or close the browser. This uses Komoot's unofficial web API, which may stop working if Komoot changes it. If it does, download GPX files from komoot.com and use the Files tab.",
     signedIn: 'Signed in as {name}.',
     signOut: 'Sign out',
     which: 'Which tours',
@@ -128,7 +128,7 @@ export const en = {
     syncing: 'Syncing the {device}…',
     removeTitle: 'Delete {n} file from the {device}? | Delete {n} files from the {device}?',
     removeMessage:
-      'These files in the {folder} folder are not active routes in Trailplan (they may be archived, deleted or from another app). New and changed routes are copied either way.',
+      'These files in the {folder} folder are not active routes in Trail Planner (they may be archived, deleted or from another app). New and changed routes are copied either way.',
     removeConfirm: 'Delete and sync',
     removeCancel: 'Keep them',
     nothingToCopy:
@@ -154,7 +154,7 @@ export const fr: typeof en = {
     which: 'Quels itinéraires',
     all: 'Tous les itinéraires',
     favorites: 'Favoris',
-    planned: 'Planifiés dans Trailplan',
+    planned: 'Planifiés dans Trail Planner',
     imported: 'Importés',
   },
   sort: {
@@ -252,7 +252,7 @@ export const fr: typeof en = {
     email: 'E-mail Komoot',
     password: 'Mot de passe',
     signIn: 'Se connecter à Komoot',
-    note: 'Votre mot de passe est envoyé uniquement à Komoot et n’est pas enregistré ; Trailplan garde le jeton de session Komoot jusqu’à ce que vous vous déconnectiez ou fermiez le navigateur. Cette fonction utilise l’API web non officielle de Komoot, qui peut cesser de fonctionner si Komoot la modifie. Dans ce cas, téléchargez des fichiers GPX sur komoot.com et utilisez l’onglet Fichiers.',
+    note: 'Votre mot de passe est envoyé uniquement à Komoot et n’est pas enregistré ; Trail Planner garde le jeton de session Komoot jusqu’à ce que vous vous déconnectiez ou fermiez le navigateur. Cette fonction utilise l’API web non officielle de Komoot, qui peut cesser de fonctionner si Komoot la modifie. Dans ce cas, téléchargez des fichiers GPX sur komoot.com et utilisez l’onglet Fichiers.',
     signedIn: 'Connecté en tant que {name}.',
     signOut: 'Se déconnecter',
     which: 'Quels tours',
@@ -275,7 +275,7 @@ export const fr: typeof en = {
     syncing: 'Synchronisation du {device}…',
     removeTitle: 'Supprimer {n} fichier du {device} ? | Supprimer {n} fichiers du {device} ?',
     removeMessage:
-      'Ces fichiers du dossier {folder} ne sont pas des itinéraires actifs dans Trailplan (ils sont peut-être archivés, supprimés ou proviennent d’une autre application). Les itinéraires nouveaux et modifiés sont copiés dans tous les cas.',
+      'Ces fichiers du dossier {folder} ne sont pas des itinéraires actifs dans Trail Planner (ils sont peut-être archivés, supprimés ou proviennent d’une autre application). Les itinéraires nouveaux et modifiés sont copiés dans tous les cas.',
     removeConfirm: 'Supprimer et synchroniser',
     removeCancel: 'Les garder',
     nothingToCopy:
@@ -301,7 +301,7 @@ export const de: typeof en = {
     which: 'Welche Routen',
     all: 'Alle Routen',
     favorites: 'Favoriten',
-    planned: 'In Trailplan geplant',
+    planned: 'In Trail Planner geplant',
     imported: 'Importiert',
   },
   sort: {
@@ -397,7 +397,7 @@ export const de: typeof en = {
     email: 'Komoot-E-Mail',
     password: 'Passwort',
     signIn: 'Bei Komoot anmelden',
-    note: 'Dein Passwort geht nur an Komoot und wird nicht gespeichert; Trailplan behält das Sitzungstoken von Komoot, bis du dich abmeldest oder den Browser schließt. Das nutzt die inoffizielle Web-API von Komoot, die nicht mehr funktionieren kann, wenn Komoot sie ändert. Lade dann GPX-Dateien von komoot.com herunter und nutze den Dateien-Tab.',
+    note: 'Dein Passwort geht nur an Komoot und wird nicht gespeichert; Trail Planner behält das Sitzungstoken von Komoot, bis du dich abmeldest oder den Browser schließt. Das nutzt die inoffizielle Web-API von Komoot, die nicht mehr funktionieren kann, wenn Komoot sie ändert. Lade dann GPX-Dateien von komoot.com herunter und nutze den Dateien-Tab.',
     signedIn: 'Angemeldet als {name}.',
     signOut: 'Abmelden',
     which: 'Welche Touren',
@@ -420,7 +420,7 @@ export const de: typeof en = {
     syncing: '{device} wird synchronisiert…',
     removeTitle: '{n} Datei vom {device} löschen? | {n} Dateien vom {device} löschen?',
     removeMessage:
-      'Diese Dateien im Ordner {folder} sind keine aktiven Routen in Trailplan (vielleicht archiviert, gelöscht oder aus einer anderen App). Neue und geänderte Routen werden so oder so kopiert.',
+      'Diese Dateien im Ordner {folder} sind keine aktiven Routen in Trail Planner (vielleicht archiviert, gelöscht oder aus einer anderen App). Neue und geänderte Routen werden so oder so kopiert.',
     removeConfirm: 'Löschen und synchronisieren',
     removeCancel: 'Behalten',
     nothingToCopy:

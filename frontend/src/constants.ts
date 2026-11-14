@@ -168,5 +168,5 @@ export const DEFAULT_PREFERENCES: RoutingPreferences = {
   activity: 'MTB',
 }
 
-/** Luxembourg City – the initial view before the rider has planned anything. */
-export const DEFAULT_CENTER: [number, number] = [6.13, 49.61]
+/** The whole world: the view until the server's start area (TRAILPLANNER_AREA) has arrived. */
+export const WORLD_VIEW = { center: [0, 20] as [number, number], zoom: 1 }

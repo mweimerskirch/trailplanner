@@ -1,4 +1,4 @@
-# Trailplan: BRouter (routing) + Spring Boot (API, SQLite) + nginx (Vue app, /api proxy).
+# Trail Planner: BRouter (routing) + Spring Boot (API, SQLite) + nginx (Vue app, /api proxy).
 # First run: ./scripts/download-segments.sh, then: docker compose up -d --build
 # Open http://localhost:8080
 
@@ -17,8 +17,9 @@ services:
     environment:
       BROUTER_URL: http://brouter:17777
       BROUTER_CUSTOM_PROFILE_DIR: /customprofiles
-      TRAILPLAN_DB: /data/trailplan.db
-      TRAILPLAN_ALLOWED_HOSTS: ${TRAILPLAN_ALLOWED_HOSTS:-}
+      TRAILPLANNER_DB: /data/trailplan.db
+      TRAILPLANNER_ALLOWED_HOSTS: ${TRAILPLANNER_ALLOWED_HOSTS:-}
+      TRAILPLANNER_AREA: ${TRAILPLANNER_AREA:-}
     volumes:
       - ./data/db:/data
       - ./data/customprofiles:/customprofiles
@@ -35,7 +36,7 @@ services:
   web:
     build: ./frontend
     ports:
-      - "${TRAILPLAN_PORT:-8080}:80"
+      - "${TRAILPLANNER_PORT:-8080}:80"
     depends_on:
       - backend
     restart: unless-stopped

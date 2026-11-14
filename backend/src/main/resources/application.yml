@@ -4,9 +4,9 @@ server:
   forward-headers-strategy: framework
 
 spring:
-  application.name: trailplan
+  application.name: trailplanner
   datasource:
-    url: jdbc:sqlite:${TRAILPLAN_DB:../data/trailplan.db}
+    url: jdbc:sqlite:${TRAILPLANNER_DB:../data/trailplan.db}
     driver-class-name: org.sqlite.JDBC
     hikari:
       # SQLite allows one writer at a time; a single connection avoids SQLITE_BUSY errors.
@@ -25,9 +25,11 @@ spring:
     basename: messages
     fallback-to-system-locale: false
 
-trailplan:
-  # Host names under which the API may be used, besides IP addresses and localhost (protection against DNS rebinding). Comma-separated, e.g. "trailplan.home".
-  allowed-hosts: ${TRAILPLAN_ALLOWED_HOSTS:}
+trailplanner:
+  # Host names under which the API may be used, besides IP addresses and localhost (protection against DNS rebinding). Comma-separated, e.g. "trailplanner.home".
+  allowed-hosts: ${TRAILPLANNER_ALLOWED_HOSTS:}
+  # Where the map opens before anything is planned: "latitude,longitude[,zoom]". Blank: Luxembourg.
+  area: ${TRAILPLANNER_AREA:}
   router:
     base-url: ${BROUTER_URL:http://localhost:17777}
     custom-profile-dir: ${BROUTER_CUSTOM_PROFILE_DIR:../data/customprofiles}

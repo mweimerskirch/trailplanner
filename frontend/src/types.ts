@@ -1,4 +1,4 @@
-// Mirrors the backend API (app.trailplan.*). Keep in sync with the Java records.
+// Mirrors the backend API (app.trailplanner.*). Keep in sync with the Java records.
 
 export type WayCategory =
   'TRAIL' | 'ROUGH_TRACK' | 'GRAVEL_TRACK' | 'FOOTWAY' | 'CYCLEWAY' | 'QUIET_ROAD' | 'MAIN_ROAD' | 'BUSY_ROAD'
@@ -121,7 +121,7 @@ export interface TransferMethod {
   steps: string[]
 }
 
-/** A device plugin as described by the backend (app.trailplan.devices). */
+/** A device plugin as described by the backend (app.trailplanner.devices). */
 export interface DeviceInfo {
   id: string
   name: string
@@ -202,7 +202,7 @@ export interface SyncFile {
   routeName: string | null
 }
 
-/** What syncing would change (app.trailplan.devices.DeviceSyncService). */
+/** What syncing would change (app.trailplanner.devices.DeviceSyncService). */
 export interface SyncPlan {
   /** The connected device's model, e.g. "ELEMNT-BOLT2". */
   device: string
@@ -270,4 +270,16 @@ export interface Preset {
   name: string
   preferences: RoutingPreferences
   position: number
+}
+
+/** Where the map opens before anything is planned (config.StartArea). */
+export interface StartArea {
+  lat: number
+  lng: number
+  zoom: number
+}
+
+/** Server settings (config.SettingsController). */
+export interface Settings {
+  area: StartArea
 }

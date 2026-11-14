@@ -1,5 +1,5 @@
 <script setup lang="ts">
-/** The Trailplan mark (same as the favicon): hills with a route line. */
+/** The Trail Planner mark (same as the favicon): hills with a route line. */
 withDefaults(defineProps<{ size?: number }>(), { size: 30 })
 </script>
 
