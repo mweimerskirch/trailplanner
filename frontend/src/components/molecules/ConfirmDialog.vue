@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { answerConfirm, pendingConfirm } from '@/confirm'
 
 /**
@@ -7,6 +8,7 @@ import { answerConfirm, pendingConfirm } from '@/confirm'
  * opened with askConfirm() from confirm.ts. Escape, the backdrop and Cancel all mean "no"; the
  * focus starts on Cancel so that Enter never deletes by accident.
  */
+const { t } = useI18n()
 const dialog = useTemplateRef<HTMLDialogElement>('dialog')
 const cancelButton = useTemplateRef<HTMLButtonElement>('cancelButton')
 
@@ -43,7 +45,7 @@ function onClose() {
       </ul>
       <div class="buttons">
         <button ref="cancelButton" type="button" @click="answerConfirm(false)">
-          {{ pendingConfirm.cancelLabel ?? 'Cancel' }}
+          {{ pendingConfirm.cancelLabel ?? t('common.action.cancel') }}
         </button>
         <button
           type="button"

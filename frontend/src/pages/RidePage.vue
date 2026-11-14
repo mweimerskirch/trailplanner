@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import StatTile from '@/components/molecules/StatTile.vue'
@@ -9,7 +10,7 @@ import TrackMap from '@/components/organisms/TrackMap.vue'
 import PageLayout from '@/components/templates/PageLayout.vue'
 import { askConfirm } from '@/confirm'
 import { saveFile } from '@/files'
-import { duration, km, kmh, rideDate } from '@/format'
+import { duration, km, kmh, num, rideDate } from '@/format'
 import * as planner from '@/planner'
 import { trackProfile } from '@/profile'
 import type { RideDetails } from '@/types'
@@ -17,6 +18,7 @@ import type { RideDetails } from '@/types'
 /** One recorded ride: its track on the map and its figures. */
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const details = ref<RideDetails | null>(null)
 const error = ref<string | null>(null)
 const busy = ref(false)
@@ -37,17 +39,33 @@ const tiles = computed(() => {
   const r = ride.value
   if (!r) return []
   const all: { value: string; label: string; show: boolean }[] = [
-    { value: km(r.distance), label: 'km', show: true },
-    { value: duration(r.moving), label: 'moving', show: true },
-    { value: duration(r.elapsed), label: 'elapsed', show: Math.abs(r.elapsed - r.moving) >= 60 },
-    { value: String(Math.round(r.ascent)), label: 'm up', show: true },
-    { value: String(Math.round(r.descent)), label: 'm down', show: true },
-    { value: r.avgSpeed === null ? '' : kmh(r.avgSpeed), label: 'km/h avg', show: r.avgSpeed !== null },
-    { value: r.maxSpeed === null ? '' : kmh(r.maxSpeed), label: 'km/h max', show: r.maxSpeed !== null },
-    { value: String(r.avgHeartRate ?? ''), label: 'bpm avg', show: r.avgHeartRate !== null },
-    { value: String(r.maxHeartRate ?? ''), label: 'bpm max', show: r.maxHeartRate !== null },
-    { value: String(r.avgPower ?? ''), label: 'W avg', show: r.avgPower !== null },
-    { value: String(r.calories ?? ''), label: 'kcal', show: r.calories !== null },
+    { value: km(r.distance), label: t('common.unit.km'), show: true },
+    { value: duration(r.moving), label: t('rides.tile.moving'), show: true },
+    {
+      value: duration(r.elapsed),
+      label: t('rides.tile.elapsed'),
+      show: Math.abs(r.elapsed - r.moving) >= 60,
+    },
+    { value: num(r.ascent), label: t('rides.tile.up'), show: true },
+    { value: num(r.descent), label: t('rides.tile.down'), show: true },
+    {
+      value: r.avgSpeed === null ? '' : kmh(r.avgSpeed),
+      label: t('rides.tile.speedAvg'),
+      show: r.avgSpeed !== null,
+    },
+    {
+      value: r.maxSpeed === null ? '' : kmh(r.maxSpeed),
+      label: t('rides.tile.speedMax'),
+      show: r.maxSpeed !== null,
+    },
+    { value: String(r.avgHeartRate ?? ''), label: t('rides.tile.heartAvg'), show: r.avgHeartRate !== null },
+    { value: String(r.maxHeartRate ?? ''), label: t('rides.tile.heartMax'), show: r.maxHeartRate !== null },
+    { value: String(r.avgPower ?? ''), label: t('rides.tile.powerAvg'), show: r.avgPower !== null },
+    {
+      value: r.calories === null ? '' : num(r.calories),
+      label: t('rides.tile.calories'),
+      show: r.calories !== null,
+    },
   ]
   return all.filter((t) => t.show)
 })
@@ -60,7 +78,7 @@ async function load() {
   try {
     details.value = await api.getRide(id)
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'The ride is unavailable.'
+    error.value = e instanceof Error ? e.message : t('rides.error.unavailable')
   }
 }
 
@@ -91,7 +109,7 @@ async function finishRename() {
   await act(async () => {
     if (!details.value) return
     details.value.ride = await api.renameRide(details.value.ride.id, name)
-  }, 'Could not rename the ride.')
+  }, t('rides.error.rename'))
 }
 
 const saveAsRoute = () =>
@@ -101,33 +119,33 @@ const saveAsRoute = () =>
     details.value.routeId = result.routeId
     planner.libraryVersion.value++
     planner.setStatus(
-      result.status === 'IMPORTED' ? `Added “${result.name ?? ''}” to the library.` : (result.message ?? ''),
+      result.status === 'IMPORTED'
+        ? t('rides.addedToLibrary', { name: result.name ?? '' })
+        : (result.message ?? ''),
       'info',
       4000,
     )
-  }, 'Could not add the ride to the library.')
+  }, t('rides.error.addToLibrary'))
 
 const download = () =>
   act(async () => {
     if (ride.value) saveFile(await api.rideFile(ride.value.id))
-  }, 'Could not download the ride.')
+  }, t('rides.error.download'))
 
 async function remove() {
   const r = ride.value
   if (!r) return
   const ok = await askConfirm({
-    title: `Delete “${r.name}”?`,
-    message:
-      'The ride is deleted from Trailplan, not from the device. Importing from the device will not ' +
-      'bring it back; uploading its FIT file will.',
-    confirmLabel: 'Delete ride',
+    title: t('rides.confirmDelete.title', { name: r.name }),
+    message: t('rides.confirmDelete.message'),
+    confirmLabel: t('rides.confirmDelete.confirm'),
     danger: true,
   })
   if (!ok) return
   await act(async () => {
     await api.deleteRide(r.id)
     await router.push('/rides')
-  }, 'Could not delete the ride.')
+  }, t('rides.error.delete'))
 }
 
 watch(() => route.params.id, load, { immediate: true })
@@ -135,10 +153,10 @@ watch(() => route.params.id, load, { immediate: true })
 
 <template>
   <PageLayout>
-    <RouterLink to="/rides" class="back">← Rides</RouterLink>
+    <RouterLink to="/rides" class="back">{{ t('rides.back') }}</RouterLink>
 
     <p v-if="error" class="empty">{{ error }}</p>
-    <p v-else-if="!details || !ride" class="empty">Loading…</p>
+    <p v-else-if="!details || !ride" class="empty">{{ t('common.loading') }}</p>
     <template v-else>
       <header class="head">
         <div class="title">
@@ -148,13 +166,15 @@ watch(() => route.params.id, load, { immediate: true })
             v-model="nameText"
             type="text"
             maxlength="120"
-            aria-label="Ride name"
+            :aria-label="t('rides.nameLabel')"
             @keydown.enter.prevent="finishRename"
             @keydown.esc.prevent="renaming = false"
             @blur="finishRename"
           />
           <h1 v-else>
-            <button type="button" class="name" title="Rename" @click="startRename">{{ ride.name }}</button>
+            <button type="button" class="name" :title="t('common.action.rename')" @click="startRename">
+              {{ ride.name }}
+            </button>
           </h1>
           <p class="when">{{ rideDate(ride.startedAt, ride.utcOffset) }}</p>
         </div>
@@ -164,29 +184,31 @@ watch(() => route.params.id, load, { immediate: true })
             :to="`/routes/${String(details.routeId)}`"
             class="button"
           >
-            Open as route
+            {{ t('rides.openAsRoute') }}
           </RouterLink>
           <button
             v-else
             type="button"
             class="primary"
             :disabled="busy"
-            title="Add this track to the library, to ride it again or edit it"
+            :title="t('rides.saveAsRouteHint')"
             @click="saveAsRoute"
           >
-            Save as route
+            {{ t('rides.saveAsRoute') }}
           </button>
-          <button type="button" :disabled="busy" title="The FIT file as recorded" @click="download">
-            Download FIT
+          <button type="button" :disabled="busy" :title="t('rides.downloadFitHint')" @click="download">
+            {{ t('rides.downloadFit') }}
           </button>
-          <button type="button" class="danger" :disabled="busy" @click="remove">Delete</button>
+          <button type="button" class="danger" :disabled="busy" @click="remove">
+            {{ t('common.action.delete') }}
+          </button>
         </div>
       </header>
 
       <StatusMessage :message="planner.status.value" />
 
       <div class="stats">
-        <StatTile v-for="t in tiles" :key="t.label" :value="t.value" :label="t.label" />
+        <StatTile v-for="tile in tiles" :key="tile.label" :value="tile.value" :label="tile.label" />
       </div>
 
       <div class="map">
@@ -196,7 +218,7 @@ watch(() => route.params.id, load, { immediate: true })
         v-if="hasElevation && profile.length > 1"
         v-model:hover-index="hoverIndex"
         :points="profile"
-        label="Elevation profile of the ride"
+        :label="t('rides.elevation')"
         class="elevation"
       />
     </template>

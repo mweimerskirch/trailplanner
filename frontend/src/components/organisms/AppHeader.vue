@@ -2,12 +2,15 @@
 import { computed } from 'vue'
 import { RouterLink, useRoute } from 'vue-router'
 import AppLogo from '@/components/atoms/AppLogo.vue'
+import { useI18n } from 'vue-i18n'
+import LanguageSwitcher from '@/components/molecules/LanguageSwitcher.vue'
 import RiderMenu from '@/components/molecules/RiderMenu.vue'
 import { routeId } from '@/planner'
 import { currentRider } from '@/session'
 
 /** The app bar on every page: logo, main navigation and the rider menu. */
 const route = useRoute()
+const { t } = useI18n()
 /** "Planner" goes back to the open route, if any, not to an empty planner. */
 const plannerLink = computed(() => (routeId.value === null ? '/' : `/routes/${String(routeId.value)}`))
 const section = computed(() => {
@@ -19,19 +22,26 @@ const section = computed(() => {
 
 <template>
   <header class="app-header">
-    <RouterLink :to="currentRider ? '/library' : '/riders'" class="brand" aria-label="Trailplan home">
+    <RouterLink :to="currentRider ? '/library' : '/riders'" class="brand" :aria-label="t('common.nav.home')">
       <AppLogo />
       <span class="name">Trailplan</span>
     </RouterLink>
 
     <template v-if="currentRider">
-      <nav class="main" aria-label="Main">
-        <RouterLink to="/library" :class="{ current: section === 'library' }">Library</RouterLink>
-        <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">Planner</RouterLink>
-        <RouterLink to="/rides" :class="{ current: section === 'rides' }">Rides</RouterLink>
+      <nav class="main" :aria-label="t('common.nav.main')">
+        <RouterLink to="/library" :class="{ current: section === 'library' }">{{
+          t('common.nav.library')
+        }}</RouterLink>
+        <RouterLink :to="plannerLink" :class="{ current: section === 'planner' }">{{
+          t('common.nav.planner')
+        }}</RouterLink>
+        <RouterLink to="/rides" :class="{ current: section === 'rides' }">{{
+          t('common.nav.rides')
+        }}</RouterLink>
       </nav>
-      <RiderMenu :rider="currentRider" class="menu" />
     </template>
+    <LanguageSwitcher class="language" />
+    <RiderMenu v-if="currentRider" :rider="currentRider" />
   </header>
 </template>
 
@@ -82,7 +92,7 @@ const section = computed(() => {
   color: var(--ink);
   border-bottom-color: var(--moss);
 }
-.menu {
+.language {
   margin-left: auto;
 }
 @media (max-width: 560px) {

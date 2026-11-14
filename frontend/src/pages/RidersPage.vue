@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import { askConfirm } from '@/confirm'
@@ -10,6 +11,7 @@ import type { RiderSummary } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
+const { t } = useI18n()
 const riders = ref<RiderSummary[]>([])
 const loading = ref(true)
 const error = ref('')
@@ -31,7 +33,7 @@ async function load() {
     riders.value = await api.riders()
     error.value = ''
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'The server is not reachable.'
+    error.value = e instanceof Error ? e.message : t('riders.error.unreachable')
   } finally {
     loading.value = false
   }
@@ -42,7 +44,7 @@ async function act(task: () => Promise<void>) {
   try {
     await task()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Something went wrong.'
+    error.value = e instanceof Error ? e.message : t('riders.error.generic')
   }
 }
 
@@ -89,12 +91,12 @@ const finishRename = (rider: RiderSummary) =>
 
 const remove = (rider: RiderSummary) =>
   act(async () => {
-    const routes = rider.routes === 1 ? '1 route' : `${String(rider.routes)} routes`
+    const routes = t('riders.routes', { n: rider.routes }, rider.routes)
     if (
       !(await askConfirm({
-        title: `Delete ${rider.name}?`,
-        message: `${rider.name} and all their routes (${routes} in the list, plus any archived or in the trash) will be deleted permanently. This cannot be undone.`,
-        confirmLabel: 'Delete rider',
+        title: t('riders.confirmDelete.title', { name: rider.name }),
+        message: t('riders.confirmDelete.message', { name: rider.name, routes }),
+        confirmLabel: t('riders.confirmDelete.confirm'),
         danger: true,
       }))
     ) {
@@ -114,10 +116,10 @@ onMounted(async () => {
 
 <template>
   <CenteredLayout>
-    <h1>Who's planning?</h1>
-    <p class="sub">Pick your name to open your library.</p>
+    <h1>{{ t('riders.title') }}</h1>
+    <p class="sub">{{ t('riders.sub') }}</p>
 
-    <p v-if="loading" class="empty">Loading…</p>
+    <p v-if="loading" class="empty">{{ t('common.loading') }}</p>
     <ul v-else-if="riders.length" class="riders">
       <li v-for="r in riders" :key="r.id">
         <template v-if="renamingId === r.id">
@@ -126,7 +128,7 @@ onMounted(async () => {
             v-model="renameText"
             type="text"
             maxlength="60"
-            aria-label="New name"
+            :aria-label="t('riders.newName')"
             @keydown.enter.prevent="finishRename(r)"
             @keydown.esc.prevent="renamingId = null"
             @blur="finishRename(r)"
@@ -143,30 +145,43 @@ onMounted(async () => {
           <Avatar :name="r.name" size="lg" />
           <span class="who">
             <span class="name">{{ r.name }}</span>
-            <span class="meta">{{ r.routes === 1 ? '1 route' : `${r.routes} routes` }}</span>
+            <span class="meta">{{ t('riders.routes', { n: r.routes }, r.routes) }}</span>
           </span>
         </button>
         <span v-if="managing && renamingId !== r.id" class="manage">
-          <button type="button" :aria-label="`Rename ${r.name}`" @click="startRename(r)">Rename</button>
-          <button type="button" class="danger" :aria-label="`Delete ${r.name}`" @click="remove(r)">
-            Delete
+          <button
+            type="button"
+            :aria-label="t('riders.renameRider', { name: r.name })"
+            @click="startRename(r)"
+          >
+            {{ t('common.action.rename') }}
+          </button>
+          <button
+            type="button"
+            class="danger"
+            :aria-label="t('riders.deleteRider', { name: r.name })"
+            @click="remove(r)"
+          >
+            {{ t('common.action.delete') }}
           </button>
         </span>
       </li>
     </ul>
 
     <form class="add" @submit.prevent="add">
-      <label for="new-rider">{{ riders.length ? 'Add a rider' : 'Add the first rider' }}</label>
+      <label for="new-rider">{{ riders.length ? t('riders.add') : t('riders.addFirst') }}</label>
       <div class="row">
         <input
           id="new-rider"
           v-model="newName"
           type="text"
           maxlength="60"
-          placeholder="Name"
+          :placeholder="t('riders.namePlaceholder')"
           autocomplete="off"
         />
-        <button type="submit" class="primary" :disabled="!newName.trim()">Add</button>
+        <button type="submit" class="primary" :disabled="!newName.trim()">
+          {{ t('common.action.add') }}
+        </button>
       </div>
     </form>
 
@@ -174,9 +189,9 @@ onMounted(async () => {
 
     <div class="foot">
       <button v-if="riders.length" type="button" class="link" @click="managing = !managing">
-        {{ managing ? 'Done' : 'Manage riders' }}
+        {{ managing ? t('riders.done') : t('riders.manage') }}
       </button>
-      <span class="note">No passwords: everyone on this network can open every library.</span>
+      <span class="note">{{ t('riders.noPasswords') }}</span>
     </div>
   </CenteredLayout>
 </template>

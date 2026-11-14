@@ -75,7 +75,7 @@ class BRouterResponseParserTest {
     // One warning per stretch: the two construction rows are one stretch; bicycle=yes overrides.
     assertThat(leg.warnings())
         .containsExactly(
-            new RouteWarning(6.131, 49.611, "Under construction (closed in OpenStreetMap)"),
-            new RouteWarning(6.134, 49.614, "Private way"));
+            new RouteWarning(6.131, 49.611, RouteWarning.Reason.UNDER_CONSTRUCTION),
+            new RouteWarning(6.134, 49.614, RouteWarning.Reason.PRIVATE));
   }
 }

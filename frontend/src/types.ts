@@ -38,7 +38,10 @@ export interface Waypoint extends GeoPoint {
 export interface RouteWarning {
   lng: number
   lat: number
+  /** English text, for codes the app does not know. */
   reason: string
+  /** Stable reason code (UNDER_CONSTRUCTION, NO_BIKES …), translated in routing.warning. */
+  code?: string | null
 }
 
 /** [lng, lat, elevation] – elevation is null where the elevation model has no data. */

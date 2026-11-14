@@ -1,5 +1,26 @@
 import { describe, expect, it } from 'vitest'
+import { setLocale } from '@/i18n'
 import { describeWay, distanceToLine, wayInfoHtml, wayType } from './wayInfo'
+
+describe('way info in other languages', () => {
+  it('translates labels and known OSM values, and shows unknown values as they are', () => {
+    setLocale('fr')
+    try {
+      expect(wayType({ class: 'service', service: 'driveway' })).toBe('Voie de service (accès privé)')
+      const info = describeWay(
+        { class: 'path', subclass: 'cycleway', surface: 'gravel', bicycle: 'odd' },
+        null,
+      )
+      expect(info?.title).toBe('Piste cyclable')
+      expect(info?.rows).toEqual([
+        { label: 'Revêtement', value: 'gravier' },
+        { label: 'Vélos', value: 'odd' },
+      ])
+    } finally {
+      setLocale('en')
+    }
+  })
+})
 
 describe('wayType', () => {
   it('names paths by subclass and roads by class', () => {

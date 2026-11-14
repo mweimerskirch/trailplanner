@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api, ApiError } from '@/api'
 import StarToggle from '@/components/atoms/StarToggle.vue'
 import { saveFile } from '@/files'
@@ -7,6 +8,8 @@ import * as planner from '@/planner'
 import type { DeviceInfo, FormatInfo, RouteDetails } from '@/types'
 
 const DEVICE_KEY = 'trailplan.device'
+
+const { t, locale } = useI18n()
 
 const busy = ref(false)
 const devices = ref<DeviceInfo[]>([])
@@ -26,7 +29,7 @@ async function run(task: () => Promise<void>) {
   try {
     await task()
   } catch (error) {
-    planner.setStatus(error instanceof Error ? error.message : 'Something went wrong.', 'error')
+    planner.setStatus(error instanceof Error ? error.message : t('planner.export.failed'), 'error')
   } finally {
     busy.value = false
   }
@@ -43,7 +46,7 @@ async function saveDraft(asNew = false): Promise<RouteDetails> {
   if (planner.viewOnly.value && id !== null) {
     saved = asNew
       ? await api.duplicateRoute(id)
-      : await api.renameRoute(id, planner.routeName.value.trim() || 'Route')
+      : await api.renameRoute(id, planner.routeName.value.trim() || t('common.route'))
   } else if (id === null || asNew) {
     saved = await api.createRoute(planner.draft())
   } else {
@@ -57,7 +60,7 @@ async function saveDraft(asNew = false): Promise<RouteDetails> {
 const save = (asNew: boolean) =>
   run(async () => {
     const saved = await saveDraft(asNew)
-    planner.setStatus(`Saved “${saved.name}”.`, 'info', 2500)
+    planner.setStatus(t('planner.export.saved', { name: saved.name }), 'info', 2500)
   })
 
 /** Imported routes in view mode are exported as stored; planned ones are recalculated. */
@@ -84,6 +87,9 @@ const share = (format: FormatInfo) =>
     }
   })
 
+// Device texts come from the server in the chosen language.
+watch(locale, () => void loadDevices())
+
 async function loadDevices() {
   try {
     devices.value = await api.devices()
@@ -108,15 +114,15 @@ onMounted(async () => {
 
 <template>
   <section aria-labelledby="export-heading">
-    <h2 id="export-heading">Save &amp; send</h2>
+    <h2 id="export-heading">{{ t('planner.export.heading') }}</h2>
     <div class="field">
-      <label for="route-name">Route name</label>
+      <label for="route-name">{{ t('planner.export.routeName') }}</label>
       <div class="name-row">
         <input id="route-name" v-model="planner.routeName.value" type="text" maxlength="120" />
         <StarToggle
           v-if="planner.routeId.value !== null"
           :starred="planner.favorite.value"
-          :label="planner.routeName.value || 'this route'"
+          :label="planner.routeName.value || t('planner.export.thisRoute')"
           @toggle="void planner.toggleFavorite()"
         />
       </div>
@@ -125,20 +131,20 @@ onMounted(async () => {
       <button type="button" class="primary" :disabled="!ready" @click="save(false)">
         {{
           planner.routeId.value === null
-            ? 'Save to library'
+            ? t('planner.export.saveToLibrary')
             : planner.viewOnly.value
-              ? 'Save name'
-              : 'Save changes'
+              ? t('planner.export.saveName')
+              : t('planner.export.saveChanges')
         }}
       </button>
       <button v-if="planner.routeId.value !== null" type="button" :disabled="!ready" @click="save(true)">
-        Save as new
+        {{ t('planner.export.saveAsNew') }}
       </button>
     </div>
 
     <template v-if="device">
       <div v-if="devices.length > 1" class="field device">
-        <label for="device">Send to</label>
+        <label for="device">{{ t('planner.export.sendTo') }}</label>
         <select id="device" v-model="deviceId">
           <option v-for="d in devices" :key="d.id" :value="d.id">{{ d.name }}</option>
         </select>
@@ -151,16 +157,16 @@ onMounted(async () => {
           :disabled="!ready"
           @click="download(format)"
         >
-          Download {{ format.label }}
+          {{ t('planner.export.download', { format: format.label }) }}
         </button>
         <button
           v-if="planner.hasOriginal.value && !planner.viewOnly.value && device.formats[0]"
           type="button"
           :disabled="busy || planner.routeId.value === null"
-          title="The track as imported, before your edits"
+          :title="t('planner.export.downloadOriginalTitle')"
           @click="download(device.formats[0], true)"
         >
-          Download original
+          {{ t('planner.export.downloadOriginal') }}
         </button>
         <button
           v-if="canShareFiles && device.formats[0]"
@@ -168,7 +174,7 @@ onMounted(async () => {
           :disabled="!ready"
           @click="share(device.formats[0])"
         >
-          Share {{ device.formats[0].label }}
+          {{ t('planner.export.share', { format: device.formats[0].label }) }}
         </button>
       </div>
 

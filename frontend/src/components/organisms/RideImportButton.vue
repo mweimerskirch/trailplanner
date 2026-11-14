@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import * as planner from '@/planner'
 import type { DeviceInfo } from '@/types'
@@ -10,43 +11,51 @@ import type { DeviceInfo } from '@/types'
  */
 const emit = defineEmits<{ imported: [] }>()
 
+const { t, locale } = useI18n()
 const devices = ref<DeviceInfo[]>([])
 const busyId = ref<string | null>(null)
 const withRides = computed(() => devices.value.filter((d) => d.usbSync?.importsRides))
-
-const plural = (n: number, word: string) => `${String(n)} ${word}${n === 1 ? '' : 's'}`
 
 async function importFrom(device: DeviceInfo) {
   const label = device.usbSync?.label ?? device.name
   busyId.value = device.id
   try {
-    planner.setStatus(`Reading the rides on the ${label}… The first import can take a minute.`, 'info')
+    planner.setStatus(t('rides.device.reading', { device: label }), 'info')
     const result = await api.importRidesFromDevice(device.id)
-    const failed = result.failed.length
-      ? ` ${plural(result.failed.length, 'file')} could not be read: ${result.failed.map((f) => f.fileName).join(', ')}.`
+    const n = result.failed.length
+    const failed = n
+      ? t('rides.device.failed', { n, files: result.failed.map((f) => f.fileName).join(', ') }, n)
       : ''
     const message = result.imported
-      ? `Imported ${plural(result.imported, 'new ride')} from the ${result.device}.`
-      : `No new rides on the ${result.device}.`
+      ? t('rides.device.imported', { n: result.imported, device: result.device }, result.imported)
+      : t('rides.device.none', { device: result.device })
     const empty = result.withoutTrack
-      ? ` ${plural(result.withoutTrack, 'recording')} without a GPS track (e.g. started by accident) ${result.withoutTrack === 1 ? 'was' : 'were'} skipped.`
+      ? t('rides.device.withoutTrack', { n: result.withoutTrack }, result.withoutTrack)
       : ''
-    planner.setStatus(message + empty + failed, failed ? 'error' : 'info', failed ? undefined : 6000)
+    const text = [message, empty, failed].filter(Boolean).join(' ')
+    planner.setStatus(text, failed ? 'error' : 'info', failed ? undefined : 6000)
     if (result.imported) emit('imported')
   } catch (error) {
-    planner.setStatus(error instanceof Error ? error.message : `Could not read the ${label}.`, 'error')
+    planner.setStatus(
+      error instanceof Error ? error.message : t('rides.device.error', { device: label }),
+      'error',
+    )
   } finally {
     busyId.value = null
   }
 }
 
-onMounted(async () => {
+async function loadDevices() {
   try {
     devices.value = await api.devices()
   } catch {
     devices.value = []
   }
-})
+}
+
+onMounted(loadDevices)
+// Device texts come from the server in the chosen language.
+watch(locale, () => void loadDevices())
 </script>
 
 <template>
@@ -55,9 +64,13 @@ onMounted(async () => {
     :key="d.id"
     type="button"
     :disabled="busyId !== null"
-    :title="`Import the rides recorded on the ${d.usbSync?.label} connected over USB`"
+    :title="t('rides.device.hint', { device: d.usbSync?.label ?? d.name })"
     @click="importFrom(d)"
   >
-    {{ busyId === d.id ? 'Importing…' : `Import from ${d.usbSync?.label}` }}
+    {{
+      busyId === d.id
+        ? t('rides.importing')
+        : t('rides.device.button', { device: d.usbSync?.label ?? d.name })
+    }}
   </button>
 </template>

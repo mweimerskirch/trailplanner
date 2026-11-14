@@ -2,6 +2,7 @@ package app.trailplan.devices;
 
 import app.trailplan.users.CurrentUser;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -32,8 +33,8 @@ public class DeviceController {
 
   /** All supported devices with their formats and instructions. */
   @GetMapping
-  public List<DeviceService.DeviceInfo> list(CurrentUser user) {
-    return devices.devices();
+  public List<DeviceService.DeviceInfo> list(CurrentUser user, Locale locale) {
+    return devices.devices(locale);
   }
 
   /** What syncing the connected device would change; nothing is changed. */

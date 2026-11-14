@@ -16,9 +16,16 @@ public final class TestHttp {
       HttpClient.newBuilder().cookieHandler(new java.net.CookieManager()).build();
   private final int port;
   private String rider;
+  private String language;
 
   public TestHttp(int port) {
     this.port = port;
+  }
+
+  /** Sends Accept-Language with every request, as the UI does for the chosen language. */
+  public TestHttp inLanguage(String language) {
+    this.language = language;
+    return this;
   }
 
   /** Sends X-Trailplan-Rider with every request, as a page showing this rider would. */
@@ -37,6 +44,9 @@ public final class TestHttp {
             .header("X-Trailplan-Client", "web"); // as the app sends it (see ApiRequestGuard)
     if (rider != null) {
       request.header("X-Trailplan-Rider", rider);
+    }
+    if (language != null) {
+      request.header("Accept-Language", language);
     }
     if (jsonBody == null) {
       request.method(method, HttpRequest.BodyPublishers.noBody());

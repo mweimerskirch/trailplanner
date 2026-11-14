@@ -1,10 +1,14 @@
 import { ref, watch } from 'vue'
 import { api } from './api'
+import { i18n } from './i18n'
 import { mergePreferences } from './planner'
 import { currentRider } from './session'
 import type { Activity, Preset, RoutingPreferences } from './types'
 
-/** The chosen rider's riding-style presets, in their order. Reloaded when the rider changes. */
+/**
+ * The chosen rider's riding-style presets, in their order. Reloaded when the rider or the language
+ * changes (the server names built-in presets in the UI language).
+ */
 export const presets = ref<Preset[]>([])
 
 export async function loadPresets() {
@@ -12,7 +16,7 @@ export async function loadPresets() {
 }
 
 watch(
-  currentRider,
+  [currentRider, i18n.global.locale],
   () => {
     void loadPresets().catch(() => undefined)
   },

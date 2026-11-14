@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import { TRAIL_COLORS } from '@/map/trails'
 import type { Activity } from '@/types'
 
 const { activity = 'MTB' } = defineProps<{ activity?: Activity }>()
+const { t } = useI18n()
 
 /** Key to the trail overlay's colours. */
 const GRADES = [
@@ -14,21 +16,18 @@ const GRADES = [
 </script>
 
 <template>
-  <ul class="trail-legend" aria-label="Trail colours">
-    <li v-for="g in GRADES" :key="g.label" :title="`Trail graded ${g.label} (mtb:scale)`">
+  <ul class="trail-legend" :aria-label="t('map.legend.label')">
+    <li v-for="g in GRADES" :key="g.label" :title="t('map.legend.graded', { grade: g.label })">
       <span class="line" :style="{ background: g.color }" />{{ g.label }}
     </li>
-    <li title="Path or track without a grade">
-      <span class="line dashed" :style="{ color: TRAIL_COLORS.unrated }" />unrated
+    <li :title="t('map.legend.unratedHint')">
+      <span class="line dashed" :style="{ color: TRAIL_COLORS.unrated }" />{{ t('map.legend.unrated') }}
     </li>
-    <li
-      v-if="activity === 'HORSE'"
-      title="Closed (access = no / private). The map tiles have no horse access."
-    >
-      <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />no access
+    <li v-if="activity === 'HORSE'" :title="t('map.legend.noAccessHint')">
+      <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />{{ t('map.legend.noAccess') }}
     </li>
-    <li v-else title="Closed to bikes (access or bicycle = no / private)">
-      <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />no bikes
+    <li v-else :title="t('map.legend.noBikesHint')">
+      <span class="line dotted" :style="{ color: TRAIL_COLORS.forbidden }" />{{ t('map.legend.noBikes') }}
     </li>
   </ul>
 </template>

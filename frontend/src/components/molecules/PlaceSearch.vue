@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { searchPlaces, type Place } from '@/api'
 import { flyTarget, mapBounds, placeHighlight } from '@/planner'
 import { searchArea } from '@/search'
@@ -13,6 +14,7 @@ import type { Geometry } from 'geojson'
 const NEAR = { margin: 0.5, minKm: 30 }
 const WIDER = { margin: 2, minKm: 300 }
 
+const { t } = useI18n()
 const query = ref('')
 const results = ref<Place[]>([])
 const message = ref('')
@@ -20,7 +22,7 @@ const message = ref('')
 async function search() {
   const q = query.value.trim()
   if (!q) return
-  message.value = 'Searching…'
+  message.value = t('map.search.searching')
   results.value = []
   chosen = null
   placeHighlight.value = null
@@ -31,17 +33,13 @@ async function search() {
     } else {
       results.value = await searchPlaces(q, searchArea(view, NEAR.margin, NEAR.minKm))
       if (!results.value.length) {
-        message.value = 'Nothing near the map; searching a wider area…'
+        message.value = t('map.search.wider')
         results.value = await searchPlaces(q, searchArea(view, WIDER.margin, WIDER.minKm))
       }
     }
-    message.value = results.value.length
-      ? ''
-      : view
-        ? 'No places found around the map. Move or zoom out the map to search elsewhere.'
-        : 'No places found. Try a town or landmark.'
+    message.value = results.value.length ? '' : view ? t('map.search.noneAround') : t('map.search.none')
   } catch (error) {
-    message.value = error instanceof Error ? error.message : 'Search failed.'
+    message.value = error instanceof Error ? error.message : t('map.search.failed')
   }
 }
 
@@ -76,13 +74,13 @@ function choose(place: Place) {
     <input
       v-model="query"
       type="search"
-      placeholder="Search a place"
-      title="Searches around the visible part of the map"
-      aria-label="Search a place"
+      :placeholder="t('map.search.placeholder')"
+      :title="t('map.search.hint')"
+      :aria-label="t('map.search.placeholder')"
       class="grow"
       @input="clearIfEmpty"
     />
-    <button type="submit">Find</button>
+    <button type="submit">{{ t('map.search.find') }}</button>
   </form>
   <p v-if="message" class="empty">{{ message }}</p>
   <ul v-if="results.length" class="results">

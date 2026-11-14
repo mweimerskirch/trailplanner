@@ -11,6 +11,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -61,9 +62,10 @@ public class UserController {
 
   @PostMapping("/users")
   @ResponseStatus(HttpStatus.CREATED)
-  public CurrentUser create(@Valid @RequestBody NameRequest request) {
+  public CurrentUser create(@Valid @RequestBody NameRequest request, Locale locale) {
     long id = users.insert(request.name().strip(), clock.instant());
-    presets.seed(id); // new riders start with the built-in riding-style presets
+    // New riders start with the built-in riding-style presets, named in the UI's language.
+    presets.seed(id, locale);
     return users.findById(id).orElseThrow();
   }
 

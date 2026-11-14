@@ -3,13 +3,20 @@ package app.trailplan.devices;
 import app.trailplan.export.RouteFormat;
 import app.trailplan.export.RouteFormats;
 import app.trailplan.web.ApiException;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import org.springframework.context.MessageSource;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 
-/** The registered {@link DeviceIntegration}s. */
+/**
+ * The registered {@link DeviceIntegration}s. Their texts are English; translations come from the
+ * {@code messages_<language>.properties} under {@code device.<id>.…} and {@code format.<id>.label}
+ * (see messages_fr.properties), falling back to the integration's own text.
+ */
 @Service
 public class DeviceService {
 
@@ -30,9 +37,11 @@ public class DeviceService {
 
   private final Map<String, DeviceIntegration> devices = new LinkedHashMap<>();
   private final RouteFormats formats;
+  private final MessageSource messages;
 
   /** Spring passes the integrations sorted by their {@code @Order}. */
-  public DeviceService(List<DeviceIntegration> integrations, RouteFormats formats) {
+  public DeviceService(
+      List<DeviceIntegration> integrations, RouteFormats formats, MessageSource messages) {
     for (DeviceIntegration device : integrations) {
       if (devices.put(device.id(), device) != null) {
         throw new IllegalStateException("Two devices share the id " + device.id());
@@ -41,10 +50,12 @@ public class DeviceService {
       device.usbSync().ifPresent(sync -> formats.get(sync.format()));
     }
     this.formats = formats;
+    this.messages = messages;
   }
 
-  public List<DeviceInfo> devices() {
-    return devices.values().stream().map(this::info).toList();
+  /** The devices with their texts in the language (English where there is no translation). */
+  public List<DeviceInfo> devices(Locale locale) {
+    return devices.values().stream().map(device -> info(device, locale)).toList();
   }
 
   /** The device's USB sync; 404 if the device is unknown or cannot sync over USB. */
@@ -60,24 +71,51 @@ public class DeviceService {
                 HttpStatus.NOT_FOUND, "No USB sync", device.name() + " cannot sync over USB."));
   }
 
-  private DeviceInfo info(DeviceIntegration device) {
+  private DeviceInfo info(DeviceIntegration device, Locale locale) {
+    String prefix = "device." + device.id() + ".";
     List<FormatInfo> formatInfos =
-        device.exportFormats().stream().map(formats::get).map(DeviceService::formatInfo).toList();
+        device.exportFormats().stream()
+            .map(formats::get)
+            .map(format -> formatInfo(format, locale))
+            .toList();
+    List<TransferMethod> methods = new ArrayList<>();
+    for (int i = 0; i < device.transferMethods().size(); i++) {
+      TransferMethod method = device.transferMethods().get(i);
+      String key = prefix + "transfer." + i + ".";
+      List<String> steps = new ArrayList<>();
+      for (int j = 0; j < method.steps().size(); j++) {
+        steps.add(text(key + "step." + j, method.steps().get(j), locale));
+      }
+      methods.add(new TransferMethod(text(key + "title", method.title(), locale), steps));
+    }
     return new DeviceInfo(
         device.id(),
-        device.name(),
+        text(prefix + "name", device.name(), locale),
         formatInfos,
-        device.transferMethods(),
-        device.importInstructions().orElse(null),
+        methods,
+        device.importInstructions().map(t -> text(prefix + "import", t, locale)).orElse(null),
         device
             .usbSync()
             .map(s ->
                 new UsbSyncInfo(
-                    s.label(), s.folder(), s.afterSync(), s.removalNote(), s.ridesFolder() != null))
+                    s.label(),
+                    s.folder(),
+                    text(prefix + "sync.afterSync", s.afterSync(), locale),
+                    s.removalNote() == null
+                        ? null
+                        : text(prefix + "sync.removalNote", s.removalNote(), locale),
+                    s.ridesFolder() != null))
             .orElse(null));
   }
 
-  private static FormatInfo formatInfo(RouteFormat format) {
-    return new FormatInfo(format.id(), format.label(), format.extension());
+  private String text(String key, String english, Locale locale) {
+    return messages.getMessage(key, null, english, locale);
+  }
+
+  private FormatInfo formatInfo(RouteFormat format, Locale locale) {
+    return new FormatInfo(
+        format.id(),
+        text("format." + format.id() + ".label", format.label(), locale),
+        format.extension());
   }
 }

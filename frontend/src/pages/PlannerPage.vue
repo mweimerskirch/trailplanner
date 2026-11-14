@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import ElevationChart from '@/components/organisms/ElevationChart.vue'
@@ -29,6 +30,7 @@ import {
 // both directions only act while the planner is the current page.
 
 const route = useRoute()
+const { t } = useI18n()
 const router = useRouter()
 const onPlanner = () => route.name === 'planner' || route.name === 'route'
 
@@ -37,7 +39,7 @@ async function openFromUrl(id: number) {
   try {
     openRoute(await api.getRoute(id))
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Could not open the route.', 'error')
+    setStatus(error instanceof Error ? error.message : t('planner.status.openFailed'), 'error')
     await router.replace('/')
   }
 }
@@ -60,8 +62,8 @@ watch(routeId, (id) => {
 
 const hint = computed(() => {
   if (viewOnly.value) return ''
-  if (waypoints.value.length === 0) return 'Click the map to set your start point'
-  if (waypoints.value.length === 1) return 'Now click where you want to go'
+  if (waypoints.value.length === 0) return t('planner.hint.start')
+  if (waypoints.value.length === 1) return t('planner.hint.next')
   return ''
 })
 
@@ -103,10 +105,7 @@ onBeforeUnmount(() => {
       <PreferencesPanel />
       <RouteStats />
       <ExportPanel />
-      <p class="credits">
-        Map data © OpenStreetMap contributors. Routing by BRouter. Difficulty limits apply only to trails with
-        an mtb:scale tag.
-      </p>
+      <p class="credits">{{ t('planner.credits') }}</p>
     </template>
     <template #stage>
       <MapView />

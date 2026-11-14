@@ -1,30 +1,29 @@
 <script setup lang="ts">
+import { useI18n } from 'vue-i18n'
 import Badge from '@/components/atoms/Badge.vue'
+import { warningText } from '@/constants'
 import type { RouteWarning } from '@/types'
 
 /** The closed or restricted ways a route is forced through, each with a button to show it. */
 defineProps<{ warnings: RouteWarning[] }>()
 defineEmits<{ show: [warning: RouteWarning] }>()
+
+const { t } = useI18n()
 </script>
 
 <template>
   <div v-if="warnings.length" class="warnings" role="note">
     <p class="title">
       <Badge variant="warning" aria-hidden="true">!</Badge>
-      {{
-        warnings.length === 1
-          ? 'One closed or restricted way'
-          : `${warnings.length} closed or restricted ways`
-      }}
-      on this route
+      {{ t('planner.warnings.title', { n: warnings.length }, warnings.length) }}
     </p>
     <ul>
       <li v-for="(w, i) in warnings" :key="i">
-        <span>{{ w.reason }}</span>
-        <button type="button" class="link" @click="$emit('show', w)">Show</button>
+        <span>{{ warningText(w) }}</span>
+        <button type="button" class="link" @click="$emit('show', w)">{{ t('planner.warnings.show') }}</button>
       </li>
     </ul>
-    <p class="hint">Orange legs are forced through these ways. Check on site before you ride.</p>
+    <p class="hint">{{ t('planner.warnings.hint') }}</p>
   </div>
 </template>
 

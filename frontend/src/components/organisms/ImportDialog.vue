@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api, ApiError } from '@/api'
 import TabBar from '@/components/molecules/TabBar.vue'
+import { day, km, num } from '@/format'
 import type { DeviceInfo, ImportResult, KomootStatus, KomootTour } from '@/types'
 
 const emit = defineEmits<{ imported: [openId: number | null] }>()
+const { t } = useI18n()
 
 const dialog = ref<HTMLDialogElement | null>(null)
 const tab = ref<string>('files')
@@ -27,12 +30,12 @@ const selected = ref<Set<number>>(new Set())
 const visibleTours = computed(() => {
   const q = tourQuery.value.trim().toLocaleLowerCase()
   return tours.value.filter(
-    (t) =>
-      (tourFilter.value === 'all' || t.planned === (tourFilter.value === 'planned')) &&
-      (!q || t.name.toLocaleLowerCase().includes(q)),
+    (tour) =>
+      (tourFilter.value === 'all' || tour.planned === (tourFilter.value === 'planned')) &&
+      (!q || tour.name.toLocaleLowerCase().includes(q)),
   )
 })
-const selectable = computed(() => visibleTours.value.filter((t) => !t.imported))
+const selectable = computed(() => visibleTours.value.filter((tour) => !tour.imported))
 const imported = computed(() => results.value.filter((r) => r.status === 'IMPORTED'))
 
 async function open() {
@@ -43,7 +46,7 @@ async function open() {
     ;[devices.value, komoot.value] = await Promise.all([api.devices(), api.komootStatus()])
     if (komoot.value.connected && tours.value.length === 0) await loadTours()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'The server is not reachable.'
+    error.value = e instanceof Error ? e.message : t('common.error.unreachable')
   }
 }
 
@@ -57,7 +60,7 @@ async function run(task: () => Promise<void>) {
   try {
     await task()
   } catch (e) {
-    error.value = e instanceof Error ? e.message : 'Something went wrong.'
+    error.value = e instanceof Error ? e.message : t('library.import.failed')
     if (e instanceof ApiError && e.status === 401 && tab.value === 'komoot') {
       komoot.value = { connected: false, displayName: null }
     }
@@ -119,8 +122,8 @@ function toggle(id: number) {
 }
 
 function selectAll() {
-  const all = selectable.value.every((t) => selected.value.has(t.id))
-  selected.value = all ? new Set() : new Set(selectable.value.map((t) => t.id))
+  const all = selectable.value.every((tour) => selected.value.has(tour.id))
+  selected.value = all ? new Set() : new Set(selectable.value.map((tour) => tour.id))
 }
 
 /** Tours per request: large selections are imported in batches, with progress. */
@@ -132,7 +135,10 @@ const importTours = () =>
     const ids = [...selected.value]
     const all: ImportResult[] = []
     for (let i = 0; i < ids.length; i += BATCH) {
-      progress.value = `Importing ${String(Math.min(i + BATCH, ids.length))} of ${String(ids.length)}…`
+      progress.value = t('library.import.progress', {
+        done: Math.min(i + BATCH, ids.length),
+        total: ids.length,
+      })
       all.push(...(await api.komootImport(ids.slice(i, i + BATCH))))
     }
     progress.value = ''
@@ -146,8 +152,6 @@ function openRoute(id: number) {
   emit('imported', id)
 }
 
-const km = (m: number) => (m / 1000).toFixed(1)
-const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '')
 const resultIcon = (r: ImportResult) => ({ IMPORTED: '✓', ALREADY_IMPORTED: '=', FAILED: '✕' })[r.status]
 
 defineExpose({ open })
@@ -157,14 +161,14 @@ defineExpose({ open })
   <dialog ref="dialog" class="import" aria-labelledby="import-heading" @click.self="close">
     <div class="box">
       <header>
-        <h2 id="import-heading">Import routes</h2>
-        <button type="button" class="icon" aria-label="Close" @click="close">✕</button>
+        <h2 id="import-heading">{{ t('library.import.title') }}</h2>
+        <button type="button" class="icon" :aria-label="t('common.action.close')" @click="close">✕</button>
       </header>
       <TabBar
         v-model="tab"
         class="dialog-tabs"
         :tabs="[
-          { id: 'files', label: 'Files (GPX, FIT)' },
+          { id: 'files', label: t('library.import.filesTab') },
           { id: 'komoot', label: 'Komoot' },
         ]"
       />
@@ -178,25 +182,25 @@ defineExpose({ open })
           @drop.prevent="onDrop"
         >
           <input type="file" multiple accept=".gpx,.fit" class="visually-hidden" @change="onFileInput" />
-          <strong>Drop GPX or FIT files here</strong>
-          <span>or click to choose files. Several at once are fine.</span>
+          <strong>{{ t('library.import.drop') }}</strong>
+          <span>{{ t('library.import.dropHint') }}</span>
         </label>
         <div v-if="deviceHints.length" class="hints">
           <p v-for="d in deviceHints" :key="d.id">
             <b>{{ d.name }}:</b> {{ d.importInstructions }}
           </p>
-          <p><b>Komoot:</b> use the Komoot tab, or download GPX files from komoot.com and drop them here.</p>
+          <p><b>Komoot:</b> {{ t('library.import.komootHint') }}</p>
         </div>
       </div>
 
       <div v-else class="pane">
         <form v-if="!komoot.connected" class="login" @submit.prevent="login">
           <div class="field">
-            <label for="komoot-email">Komoot email</label>
+            <label for="komoot-email">{{ t('library.komoot.email') }}</label>
             <input id="komoot-email" v-model="email" type="email" autocomplete="username" required />
           </div>
           <div class="field">
-            <label for="komoot-password">Password</label>
+            <label for="komoot-password">{{ t('library.komoot.password') }}</label>
             <input
               id="komoot-password"
               v-model="password"
@@ -205,53 +209,58 @@ defineExpose({ open })
               required
             />
           </div>
-          <button type="submit" class="primary" :disabled="busy">Sign in to Komoot</button>
-          <p class="note">
-            Your password goes to Komoot only and is not stored; Trailplan keeps Komoot's session token until
-            you sign out or close the browser. This uses Komoot's unofficial web API, which may stop working
-            if Komoot changes it. If it does, download GPX files from komoot.com and use the Files tab.
-          </p>
+          <button type="submit" class="primary" :disabled="busy">{{ t('library.komoot.signIn') }}</button>
+          <p class="note">{{ t('library.komoot.note') }}</p>
         </form>
 
         <template v-else>
           <p class="signed-in">
-            Signed in as <b>{{ komoot.displayName }}</b
-            >.
-            <button type="button" class="link" @click="logout">Sign out</button>
+            <i18n-t keypath="library.komoot.signedIn" tag="span">
+              <template #name>
+                <b>{{ komoot.displayName }}</b>
+              </template>
+            </i18n-t>
+            <button type="button" class="link" @click="logout">{{ t('library.komoot.signOut') }}</button>
           </p>
           <div class="row filters">
-            <select v-model="tourFilter" aria-label="Which tours">
-              <option value="planned">Planned tours</option>
-              <option value="recorded">Recorded tours</option>
-              <option value="all">All tours</option>
+            <select v-model="tourFilter" :aria-label="t('library.komoot.which')">
+              <option value="planned">{{ t('library.komoot.planned') }}</option>
+              <option value="recorded">{{ t('library.komoot.recorded') }}</option>
+              <option value="all">{{ t('library.komoot.all') }}</option>
             </select>
-            <input v-model="tourQuery" type="search" placeholder="Filter" aria-label="Filter tours by name" />
+            <input
+              v-model="tourQuery"
+              type="search"
+              :placeholder="t('library.komoot.filter')"
+              :aria-label="t('library.komoot.filterLabel')"
+            />
           </div>
-          <p v-if="busy && tours.length === 0" class="empty">Loading your tours…</p>
-          <p v-else-if="visibleTours.length === 0" class="empty">No tours here.</p>
+          <p v-if="busy && tours.length === 0" class="empty">{{ t('library.komoot.loading') }}</p>
+          <p v-else-if="visibleTours.length === 0" class="empty">{{ t('library.komoot.none') }}</p>
           <template v-else>
             <label class="select-all">
               <input
                 type="checkbox"
-                :checked="selectable.length > 0 && selectable.every((t) => selected.has(t.id))"
+                :checked="selectable.length > 0 && selectable.every((tour) => selected.has(tour.id))"
                 :disabled="selectable.length === 0"
                 @change="selectAll"
               />
-              Select all not yet imported ({{ selectable.length }})
+              {{ t('library.komoot.selectAll', { n: selectable.length }) }}
             </label>
             <ul class="tours">
-              <li v-for="t in visibleTours" :key="t.id" :class="{ done: t.imported }">
+              <li v-for="tour in visibleTours" :key="tour.id" :class="{ done: tour.imported }">
                 <label>
                   <input
                     type="checkbox"
-                    :checked="selected.has(t.id)"
-                    :disabled="t.imported"
-                    @change="toggle(t.id)"
+                    :checked="selected.has(tour.id)"
+                    :disabled="tour.imported"
+                    @change="toggle(tour.id)"
                   />
-                  <span class="tour-name">{{ t.name }}</span>
+                  <span class="tour-name">{{ tour.name }}</span>
                   <span class="meta">
-                    {{ km(t.distance) }} km · {{ Math.round(t.ascent) }} m · {{ date(t.date) }}
-                    <template v-if="t.imported"> · in library</template>
+                    {{ km(tour.distance) }} {{ t('common.unit.km') }} · {{ num(Math.round(tour.ascent)) }}
+                    {{ t('common.unit.m') }} · {{ day(tour.date) }}
+                    <template v-if="tour.imported"> · {{ t('library.komoot.inLibrary') }}</template>
                   </span>
                 </label>
               </li>
@@ -262,19 +271,27 @@ defineExpose({ open })
               :disabled="busy || selected.size === 0"
               @click="importTours"
             >
-              Import {{ selected.size || '' }} tour{{ selected.size === 1 ? '' : 's' }}
+              {{ t('library.komoot.import', { n: selected.size }, selected.size) }}
             </button>
           </template>
         </template>
       </div>
 
-      <p v-if="busy && tab === 'files'" class="empty">Importing…</p>
+      <p v-if="busy && tab === 'files'" class="empty">{{ t('library.import.importing') }}</p>
       <p v-if="progress" class="empty" aria-live="polite">{{ progress }}</p>
       <p v-if="error" class="error" role="alert">{{ error }}</p>
       <div v-if="results.length" class="results" aria-live="polite">
         <p>
-          {{ imported.length }} imported<template v-if="results.length > imported.length">
-            · {{ results.length - imported.length }} skipped or failed</template
+          {{ t('library.import.imported', { n: imported.length }, imported.length)
+          }}<template v-if="results.length > imported.length">
+            ·
+            {{
+              t(
+                'library.import.skipped',
+                { n: results.length - imported.length },
+                results.length - imported.length,
+              )
+            }}</template
           >
         </p>
         <ul>
@@ -283,7 +300,7 @@ defineExpose({ open })
             <span class="what">{{ r.name ?? r.source }}</span>
             <span v-if="r.message" class="meta">{{ r.message }}</span>
             <button v-if="r.routeId !== null" type="button" class="link" @click="openRoute(r.routeId)">
-              Open
+              {{ t('common.action.open') }}
             </button>
           </li>
         </ul>

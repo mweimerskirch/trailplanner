@@ -5,7 +5,8 @@ import 'maplibre-gl/dist/maplibre-gl.css'
 import workerUrl from 'maplibre-gl/dist/maplibre-gl-worker.mjs?url'
 import TrailLegend from '@/components/molecules/TrailLegend.vue'
 import { onActivated, onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
-import { DEFAULT_CENTER } from '@/constants'
+import { useI18n } from 'vue-i18n'
+import { DEFAULT_CENTER, warningText } from '@/constants'
 import {
   addRasterLayers,
   addRouteLayers,
@@ -28,6 +29,7 @@ import type { GeoPoint, LegType } from '@/types'
 maplibregl.setWorkerUrl(workerUrl)
 
 const container = useTemplateRef<HTMLDivElement>('container')
+const { t, locale } = useI18n()
 const baseMap = ref<BaseMapId>((localStorage.getItem('trailplan.basemap') as BaseMapId | null) ?? 'cyclosm')
 const mtbOverlay = ref(localStorage.getItem('trailplan.mtbOverlay') === 'true')
 const trails = ref(localStorage.getItem('trailplan.trails') === 'true')
@@ -129,15 +131,11 @@ function markerElement(index: number, count: number): HTMLElement {
   } else {
     el.textContent = String(index)
   }
-  el.setAttribute('aria-label', `Waypoint ${index + 1}. Drag to move, right-click to remove.`)
+  el.setAttribute('aria-label', t('map.waypoint.aria', { n: index + 1 }))
   return el
 }
 
-const LEG_CHOICES: { type: LegType; label: string }[] = [
-  { type: 'ROUTED', label: 'Follow trails' },
-  { type: 'FORCED', label: 'Force through closed ways' },
-  { type: 'STRAIGHT', label: 'Straight line' },
-]
+const LEG_CHOICES: readonly LegType[] = ['ROUTED', 'FORCED', 'STRAIGHT']
 
 /** Popup of a waypoint: how its next leg is calculated, and removing it. */
 function waypointPopup(index: number): maplibregl.Popup {
@@ -145,18 +143,18 @@ function waypointPopup(index: number): maplibregl.Popup {
   const content = document.createElement('div')
   content.className = 'wp-popup'
   const title = document.createElement('strong')
-  title.textContent = `Waypoint ${String(index + 1)}`
+  title.textContent = t('map.waypoint.title', { n: index + 1 })
   content.append(title)
   const popup = new maplibregl.Popup({ offset: 16, closeButton: true })
   if (index < pts.length - 1) {
     const label = document.createElement('label')
-    label.textContent = 'Next leg'
+    label.textContent = t('map.waypoint.nextLeg')
     const select = document.createElement('select')
     for (const choice of LEG_CHOICES) {
       const option = document.createElement('option')
-      option.value = choice.type
-      option.textContent = choice.label
-      option.selected = (pts[index]?.leg ?? 'ROUTED') === choice.type
+      option.value = choice
+      option.textContent = t(`map.waypoint.leg.${choice}`)
+      option.selected = (pts[index]?.leg ?? 'ROUTED') === choice
       select.append(option)
     }
     select.addEventListener('change', () => {
@@ -169,7 +167,7 @@ function waypointPopup(index: number): maplibregl.Popup {
   const button = document.createElement('button')
   button.type = 'button'
   button.className = 'popup-button'
-  button.textContent = 'Remove point'
+  button.textContent = t('map.waypoint.remove')
   button.addEventListener('click', () => {
     popup.remove()
     planner.removeWaypoint(index)
@@ -192,13 +190,13 @@ function renderWarnings() {
     el.type = 'button'
     el.className = 'route-warning'
     el.textContent = '!'
-    el.setAttribute('aria-label', `Warning: ${w.reason}`)
+    el.setAttribute('aria-label', t('map.warning.aria', { reason: warningText(w) }))
     const text = document.createElement('div')
     text.className = 'warning-popup'
     const strong = document.createElement('strong')
-    strong.textContent = w.reason
+    strong.textContent = warningText(w)
     const note = document.createElement('p')
-    note.textContent = 'The route is forced through here. Check on site before you ride.'
+    note.textContent = t('map.warning.note')
     text.append(strong, note)
     const popup = new maplibregl.Popup({ offset: 14 }).setDOMContent(text)
     // Pinned just above the route, so the waypoint that often sits at the same spot stays visible
@@ -465,6 +463,12 @@ onBeforeUnmount(() => {
   map = null
 })
 
+// Markers and warning popups are plain DOM built with the texts of the moment: rebuild them.
+watch(locale, () => {
+  if (!ready) return
+  renderMarkers()
+  renderWarnings()
+})
 watch(planner.waypoints, () => {
   if (ready) renderMarkers()
 })
@@ -525,20 +529,17 @@ watch(
   <div class="map-wrap">
     <div ref="container" class="map" />
     <div class="map-layers">
-      <label class="visually-hidden" for="basemap">Base map</label>
+      <label class="visually-hidden" for="basemap">{{ t('map.layers.baseMap') }}</label>
       <select id="basemap" v-model="baseMap">
         <option v-for="b in BASE_MAPS" :key="b.id" :value="b.id">{{ b.label }}</option>
       </select>
       <label class="check">
         <input v-model="mtbOverlay" type="checkbox" />
-        MTB routes
+        {{ t('map.layers.mtbRoutes') }}
       </label>
-      <label
-        class="check"
-        title="Paths and tracks coloured by difficulty (mtb:scale), from zoom 12. Point at a way for its details."
-      >
+      <label class="check" :title="t('map.layers.trailsHint')">
         <input v-model="trails" type="checkbox" />
-        Trails
+        {{ t('map.layers.trails') }}
       </label>
       <TrailLegend v-if="trails" class="legend" :activity="planner.preferences.value.activity" />
     </div>

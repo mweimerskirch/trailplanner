@@ -19,6 +19,11 @@ spring:
     max-request-size: 100MB
   jackson:
     default-property-inclusion: always
+  # Translations of server texts (messages_fr/de.properties), chosen by the Accept-Language the UI
+  # sends. Without a translation the English text in the code is used, never the server's locale.
+  messages:
+    basename: messages
+    fallback-to-system-locale: false
 
 trailplan:
   # Host names under which the API may be used, besides IP addresses and localhost (protection against DNS rebinding). Comma-separated, e.g. "trailplan.home".

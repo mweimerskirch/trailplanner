@@ -1,10 +1,14 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { CATEGORIES, categoryText, OTHER_WAYS, SURFACES } from '@/constants'
+import { km, num } from '@/format'
 import * as planner from '@/planner'
 import BreakdownBar, { type BreakdownItem } from '@/components/molecules/BreakdownBar.vue'
 import StatTile from '@/components/molecules/StatTile.vue'
 import WarningList from '@/components/molecules/WarningList.vue'
+
+const { t } = useI18n()
 
 const time = computed(() => {
   const minutes = Math.round(planner.totals.value.hours * 60)
@@ -33,67 +37,65 @@ const hasRoute = computed(() => planner.profile.value.length > 1)
 
 <template>
   <section aria-labelledby="route-heading">
-    <h2 id="route-heading">Route</h2>
-    <p v-if="!hasRoute" class="empty">
-      Click the map to set a start point, then click where you want to go. Drag points to move them, drag the
-      route to add a via point, right-click a point to remove it.
-    </p>
+    <h2 id="route-heading">{{ t('planner.stats.heading') }}</h2>
+    <p v-if="!hasRoute" class="empty">{{ t('planner.stats.empty') }}</p>
     <template v-else>
       <div class="stats">
-        <StatTile :value="(planner.totals.value.distance / 1000).toFixed(1)" label="km" />
-        <StatTile :value="Math.round(planner.totals.value.ascent)" label="m climbing" />
-        <StatTile :value="time" label="moving time" />
+        <StatTile :value="km(planner.totals.value.distance)" :label="t('common.unit.km')" />
+        <StatTile :value="num(planner.totals.value.ascent)" :label="t('planner.stats.climbing')" />
+        <StatTile :value="time" :label="t('planner.stats.movingTime')" />
       </div>
       <label class="speed">
-        Moving time at
+        {{ t('planner.stats.speedBefore') }}
         <input
           v-model.number="planner.speed.value"
           type="number"
           min="3"
           max="50"
           step="1"
-          aria-label="Average speed on the flat in km/h"
+          :aria-label="t('planner.stats.speedLabel')"
         />
-        km/h on the flat
+        {{ t('planner.stats.speedAfter') }}
       </label>
-      <BreakdownBar :items="wayTypes" label="Way types along the route" />
-      <BreakdownBar :items="surfaces" label="Surfaces along the route" />
+      <BreakdownBar :items="wayTypes" :label="t('planner.stats.wayTypes')" />
+      <BreakdownBar :items="surfaces" :label="t('planner.stats.surfaces')" />
       <WarningList
         :warnings="planner.warnings.value"
         @show="(w) => (planner.flyTarget.value = { lat: w.lat, lng: w.lng })"
       />
       <div v-if="planner.viewOnly.value" class="imported">
-        <p>
-          Imported route, shown as recorded. Editing places as few waypoints as needed and checks every leg
-          against the original. Where the original uses a way that is closed in the map data now, the route is
-          forced through it and marked with a warning.
-        </p>
+        <p>{{ t('planner.stats.imported') }}</p>
         <button
           type="button"
           class="primary"
           :disabled="planner.converting.value"
           @click="void planner.editImportedRoute()"
         >
-          {{ planner.converting.value ? 'Matching the original…' : 'Edit route' }}
+          {{ planner.converting.value ? t('planner.stats.matching') : t('planner.stats.editRoute') }}
         </button>
       </div>
     </template>
     <div class="row actions">
-      <button type="button" :disabled="!planner.canUndo.value" title="Undo (Ctrl+Z)" @click="planner.undo">
-        Undo
+      <button
+        type="button"
+        :disabled="!planner.canUndo.value"
+        :title="t('planner.stats.undoTitle')"
+        @click="planner.undo"
+      >
+        {{ t('planner.stats.undo') }}
       </button>
       <template v-if="!planner.viewOnly.value">
-        <button type="button" @click="planner.reverseRoute">Reverse</button>
-        <button type="button" @click="planner.backToStart">Back to start</button>
+        <button type="button" @click="planner.reverseRoute">{{ t('planner.stats.reverse') }}</button>
+        <button type="button" @click="planner.backToStart">{{ t('planner.stats.backToStart') }}</button>
       </template>
-      <button type="button" @click="planner.newRoute">New</button>
+      <button type="button" @click="planner.newRoute">{{ t('planner.stats.new') }}</button>
       <button
         v-if="planner.hasOriginal.value && !planner.viewOnly.value && planner.routeId.value !== null"
         type="button"
-        title="Put the track back as it was imported"
+        :title="t('planner.stats.backToOriginalTitle')"
         @click="void planner.revertToOriginal()"
       >
-        Back to original
+        {{ t('planner.stats.backToOriginal') }}
       </button>
     </div>
   </section>

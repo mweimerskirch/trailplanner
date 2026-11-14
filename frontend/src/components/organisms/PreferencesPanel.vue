@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, ref, toRaw, useTemplateRef } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { api } from '@/api'
 import { askConfirm } from '@/confirm'
 import {
@@ -8,7 +9,7 @@ import {
   categoryText,
   DEFAULT_PREFERENCES,
   DIFFICULTIES,
-  LEVEL_LABELS,
+  levelLabel,
   LEVELS,
   WOODS_OPTIONS,
 } from '@/constants'
@@ -22,6 +23,7 @@ import type { Activity, PreferenceLevel, Preset, WayCategory } from '@/types'
  * this stays next to the map.
  */
 
+const { t, locale } = useI18n()
 const open = ref(false)
 const newName = ref('')
 const nameInput = useTemplateRef<HTMLInputElement>('nameInput')
@@ -49,15 +51,24 @@ const summary = computed(() => {
   const p = preferences.value
   const parts: string[] = []
   if (p.activity === 'MTB')
-    parts.push(p.maxDifficulty === 'ANY' ? 'any difficulty' : `${p.maxDifficulty} max`)
-  if (p.activity === 'ROAD') parts.push('paved ways only')
-  if (p.activity !== 'ROAD' && p.woods === 'PREFER') parts.push('prefers woods')
-  if (p.activity !== 'ROAD' && p.woods === 'STRONGLY_PREFER') parts.push('strongly prefers woods')
-  if (p.avoidClimbs) parts.push('avoids steep climbs')
+    parts.push(
+      p.maxDifficulty === 'ANY'
+        ? t('planner.style.summary.anyDifficulty')
+        : t('planner.style.summary.maxDifficulty', { difficulty: p.maxDifficulty }),
+    )
+  if (p.activity === 'ROAD') parts.push(t('planner.style.summary.pavedOnly'))
+  if (p.activity !== 'ROAD' && p.woods === 'PREFER') parts.push(t('planner.style.summary.prefersWoods'))
+  if (p.activity !== 'ROAD' && p.woods === 'STRONGLY_PREFER')
+    parts.push(t('planner.style.summary.stronglyPrefersWoods'))
+  if (p.avoidClimbs) parts.push(t('planner.style.summary.avoidsClimbs'))
   const favourites = categories.value
     .filter((c) => p.levels[c.key] === 'FAVOURITE')
-    .map((c) => categoryText(c, p.activity).label.toLowerCase())
-  if (favourites.length) parts.push(`loves ${favourites.join(', ')}`)
+    // Lower case inside the sentence, except in German, where nouns keep their capital.
+    .map((c) => {
+      const label = categoryText(c, p.activity).label
+      return locale.value === 'de' ? label : label.toLocaleLowerCase(locale.value)
+    })
+  if (favourites.length) parts.push(t('planner.style.summary.loves', { ways: favourites.join(', ') }))
   return parts.join(' · ')
 })
 
@@ -93,7 +104,7 @@ async function act(task: () => Promise<void>) {
   try {
     await task()
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Could not save the preset.', 'error')
+    setStatus(error instanceof Error ? error.message : t('planner.style.saveFailed'), 'error')
   }
 }
 
@@ -112,7 +123,7 @@ const saveAsNew = () =>
     await loadPresets()
     basePresetId.value = preset.id
     naming.value = false
-    setStatus(`Saved the preset “${preset.name}”.`, 'info', 2500)
+    setStatus(t('planner.style.saved', { name: preset.name }), 'info', 2500)
   })
 
 const updateBase = () =>
@@ -121,15 +132,15 @@ const updateBase = () =>
     if (!preset) return
     await api.updatePreset(preset.id, preset.name, preferences.value)
     await loadPresets()
-    setStatus(`Updated “${preset.name}”.`, 'info', 2500)
+    setStatus(t('planner.style.updated', { name: preset.name }), 'info', 2500)
   })
 
 const remove = (preset: Preset) =>
   act(async () => {
     const ok = await askConfirm({
-      title: 'Delete preset?',
-      message: `The preset “${preset.name}” will be deleted. Routes planned with it keep their settings.`,
-      confirmLabel: 'Delete preset',
+      title: t('planner.style.confirmDelete.title'),
+      message: t('planner.style.confirmDelete.message', { name: preset.name }),
+      confirmLabel: t('planner.style.confirmDelete.confirm'),
       danger: true,
     })
     if (!ok) return
@@ -141,8 +152,8 @@ const remove = (preset: Preset) =>
 
 <template>
   <section aria-labelledby="prefs-heading">
-    <h2 id="prefs-heading">Riding style</h2>
-    <div class="activities" role="radiogroup" aria-label="Activity">
+    <h2 id="prefs-heading">{{ t('planner.style.heading') }}</h2>
+    <div class="activities" role="radiogroup" :aria-label="t('planner.style.activity')">
       <button
         v-for="a in ACTIVITIES"
         :key="a.value"
@@ -156,30 +167,26 @@ const remove = (preset: Preset) =>
       </button>
     </div>
     <div class="row">
-      <label class="visually-hidden" for="preset">Preset</label>
+      <label class="visually-hidden" for="preset">{{ t('planner.style.preset') }}</label>
       <select id="preset" v-model="selected" class="grow">
         <option v-for="p in shown" :key="p.id" :value="String(p.id)">{{ p.name }}</option>
         <option v-if="!current" value="custom" disabled>
-          {{ base ? `Custom (based on ${base.name})` : 'Custom' }}
+          {{ base ? t('planner.style.customBasedOn', { name: base.name }) : t('planner.style.custom') }}
         </option>
       </select>
       <button type="button" :aria-expanded="open" aria-controls="prefs-details" @click="open = !open">
-        {{ open ? 'Done' : 'Customize…' }}
+        {{ open ? t('planner.style.done') : t('planner.style.customize') }}
       </button>
     </div>
     <p class="summary">{{ summary }}</p>
 
     <div v-if="open" id="prefs-details" class="details">
-      <p v-if="activity === 'ROAD'" class="note">
-        Unpaved and rough surfaces are always avoided; compacted gravel only for short stretches.
-      </p>
-      <p v-else-if="activity === 'HORSE'" class="note">
-        Follows horse access in OpenStreetMap. Steps, stiles and kissing gates are never used.
-      </p>
+      <p v-if="activity === 'ROAD'" class="note">{{ t('planner.style.noteRoad') }}</p>
+      <p v-else-if="activity === 'HORSE'" class="note">{{ t('planner.style.noteHorse') }}</p>
       <div v-for="c in categories" :key="c.key" class="pref">
         <label :for="`level-${c.key}`">{{ categoryText(c, activity).label }}</label>
         <output :for="`level-${c.key}`" :class="`level-${preferences.levels[c.key].toLowerCase()}`">
-          {{ LEVEL_LABELS[preferences.levels[c.key]] }}
+          {{ levelLabel(preferences.levels[c.key]) }}
         </output>
         <small>{{ categoryText(c, activity).hint }}</small>
         <input
@@ -189,50 +196,56 @@ const remove = (preset: Preset) =>
           :max="LEVELS.length - 1"
           step="1"
           :value="levelIndex(c.key)"
-          :aria-valuetext="LEVEL_LABELS[preferences.levels[c.key]]"
+          :aria-valuetext="levelLabel(preferences.levels[c.key])"
           @input="setLevel(c.key, $event)"
         />
       </div>
 
       <div v-if="activity === 'MTB'" class="field">
-        <label for="difficulty">Hardest trail allowed</label>
+        <label for="difficulty">{{ t('planner.style.hardest') }}</label>
         <select id="difficulty" v-model="preferences.maxDifficulty">
           <option v-for="d in DIFFICULTIES" :key="d.value" :value="d.value">{{ d.label }}</option>
         </select>
-        <small>Only applies where trails are tagged with a difficulty (mtb:scale).</small>
+        <small>{{ t('planner.style.hardestHint') }}</small>
       </div>
       <div v-if="activity !== 'ROAD'" class="field">
-        <label for="woods">Woods</label>
+        <label for="woods">{{ t('planner.style.woods') }}</label>
         <select id="woods" v-model="preferences.woods">
           <option v-for="w in WOODS_OPTIONS" :key="w.value" :value="w.value">{{ w.label }}</option>
         </select>
       </div>
       <div class="field check">
         <input id="climbs" v-model="preferences.avoidClimbs" type="checkbox" />
-        <label for="climbs">Avoid steep climbs</label>
+        <label for="climbs">{{ t('planner.style.avoidClimbs') }}</label>
       </div>
 
       <div class="preset-actions">
         <template v-if="!current">
-          <button v-if="base" type="button" @click="updateBase">Update “{{ base.name }}”</button>
-          <button v-if="!naming" type="button" @click="startNaming">Save as new preset…</button>
+          <button v-if="base" type="button" @click="updateBase">
+            {{ t('planner.style.update', { name: base.name }) }}
+          </button>
+          <button v-if="!naming" type="button" @click="startNaming">
+            {{ t('planner.style.saveAsNew') }}
+          </button>
           <form v-else class="row" @submit.prevent="saveAsNew">
-            <label class="visually-hidden" for="preset-name">Preset name</label>
+            <label class="visually-hidden" for="preset-name">{{ t('planner.style.presetName') }}</label>
             <input
               id="preset-name"
               ref="nameInput"
               v-model="newName"
               type="text"
               maxlength="60"
-              placeholder="Preset name"
+              :placeholder="t('planner.style.presetName')"
               class="grow"
               @keydown.esc="naming = false"
             />
-            <button type="submit" class="primary" :disabled="!newName.trim()">Save</button>
+            <button type="submit" class="primary" :disabled="!newName.trim()">
+              {{ t('common.action.save') }}
+            </button>
           </form>
         </template>
         <button v-else type="button" class="link danger" @click="remove(current)">
-          Delete preset “{{ current.name }}”
+          {{ t('planner.style.deletePreset', { name: current.name }) }}
         </button>
       </div>
     </div>

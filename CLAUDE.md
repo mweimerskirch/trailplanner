@@ -36,6 +36,17 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
   `DefaultPresets.VERSION` a rider has; a new built-in preset gets the next version as `since`.
 - Preferences have an `activity` (MTB, ROAD, HORSE; missing means MTB). Mountain-bike profiles must
   stay unchanged when adding rules for the other activities (`BRouterProfileGeneratorTest`).
+- Translations (EN, FR, DE): the frontend uses vue-i18n; texts are in
+  `frontend/src/i18n/messages/<area>.ts`, with `fr` and `de` typed as `en`. Never hard-code
+  visible text; use `t()` (in .ts modules the exported `t`, called at render time, not at module
+  load). `i18n.test.ts` checks keys, placeholders and plurals and that every `t('…')` key exists.
+  Numbers go through `num`/`km` in `format.ts`. vue-i18n syntax: `|` separates plural forms and
+  `@`, `{`, `}` are special in messages.
+- The UI sends its language as Accept-Language. Server texts (device instructions, format labels,
+  built-in preset names) are translated in `messages_fr/de.properties`, falling
+  back to the English in the code. Route warnings carry a `code` the UI translates.
+  A built-in preset keeps its DefaultPresets name in `preset.builtin` and is shown in the UI
+  language until the rider renames it.
 - BRouter rejects profiles that use tag values missing from its `lookups.dat`, including aliases
   (e.g. `horse=permissive` is folded into `yes`). Check `MTB_SCALE_VALUES` in
   `BRouterProfileGenerator` when upgrading BRouter, and route a test leg with each activity.
@@ -44,7 +55,8 @@ Self-hosted MTB route planner: Vue/MapLibre frontend (`frontend/`), Spring Boot 
 
 Vue components follow atomic design, one folder per level in `frontend/src/components/`:
 `atoms/` (AppLogo, Avatar, Badge, IconButton, StarToggle), `molecules/` (TabBar, StatusMessage,
-StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog, TrailLegend), `organisms/` (AppHeader, MapView,
+StatTile, WarningList, RiderMenu, BreakdownBar, PlaceSearch, SortableHeader, ConfirmDialog, TrailLegend,
+LanguageSwitcher), `organisms/` (AppHeader, MapView,
 ElevationChart, RouteStats, ExportPanel, ImportDialog, PreferencesPanel, DeviceSyncButton,
 RideImportButton, TrackMap) and
 `templates/` (PlannerLayout, CenteredLayout, PageLayout). Routed pages live in `frontend/src/pages/`.

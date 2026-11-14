@@ -3,6 +3,7 @@ package app.trailplan.presets;
 import app.trailplan.db.Timestamps;
 import app.trailplan.routing.RoutingPreferences;
 import java.time.Instant;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,7 +30,7 @@ public class PresetRepository {
 
   public List<Preset> findAll(long userId) {
     return jdbc.sql(
-            "SELECT id, name, preferences_json, position FROM preset WHERE rider_id = :user"
+            "SELECT id, name, preferences_json, position, builtin FROM preset WHERE rider_id = :user"
                 + " ORDER BY position, id")
         .param("user", userId)
         .query((rs, row) ->
@@ -37,7 +38,8 @@ public class PresetRepository {
                 rs.getLong("id"),
                 rs.getString("name"),
                 read(rs.getString("preferences_json")),
-                rs.getInt("position")))
+                rs.getInt("position"),
+                rs.getString("builtin")))
         .list();
   }
 
@@ -62,40 +64,65 @@ public class PresetRepository {
 
   /** Appends a preset at the end of the list. Empty if the rider already has one with the name. */
   public Optional<Long> insert(long userId, String name, RoutingPreferences prefs, Instant now) {
+    return insert(userId, name, prefs, null, now);
+  }
+
+  /** {@link #insert}, for a built-in preset ({@code builtin}: its DefaultPresets name). */
+  public Optional<Long> insert(
+      long userId, String name, RoutingPreferences prefs, String builtin, Instant now) {
     if (nameTaken(userId, name, null)) {
       return Optional.empty();
     }
     KeyHolder keys = new GeneratedKeyHolder();
     jdbc.sql(
             """
-            INSERT INTO preset (rider_id, name, preferences_json, position, created_at, updated_at)
-            VALUES (:user, :name, :prefs,
+            INSERT INTO preset
+              (rider_id, name, preferences_json, builtin, position, created_at, updated_at)
+            VALUES (:user, :name, :prefs, :builtin,
                     (SELECT COALESCE(MAX(position), 0) + 1 FROM preset WHERE rider_id = :user),
                     :now, :now)
             """)
         .param("user", userId)
         .param("name", name)
         .param("prefs", write(prefs))
+        .param("builtin", builtin)
         .param("now", Timestamps.format(now))
         .update(keys);
     Number key = keys.getKey();
     return key == null ? Optional.empty() : Optional.of(key.longValue());
   }
 
-  /** False if the preset does not exist. Check {@link #nameTaken} first. */
-  public boolean update(long userId, long id, String name, RoutingPreferences prefs, Instant now) {
+  /**
+   * False if the preset does not exist. Check {@link #nameTaken} first. {@code builtin}: as in
+   * {@link Preset}; null once the rider renamed it.
+   */
+  public boolean update(
+      long userId, long id, String name, RoutingPreferences prefs, String builtin, Instant now) {
     return jdbc.sql(
                 """
-                UPDATE preset SET name = :name, preferences_json = :prefs, updated_at = :now
+                UPDATE preset
+                SET name = :name, preferences_json = :prefs, builtin = :builtin, updated_at = :now
                 WHERE id = :id AND rider_id = :user
                 """)
             .param("id", id)
             .param("user", userId)
             .param("name", name)
             .param("prefs", write(prefs))
+            .param("builtin", builtin)
             .param("now", Timestamps.format(now))
             .update()
         == 1;
+  }
+
+  /**
+   * Marks the presets from before the builtin column that still have a built-in preset's name (in
+   * any language) as that built-in preset.
+   */
+  public void markBuiltin(String builtin, Collection<String> names) {
+    jdbc.sql("UPDATE preset SET builtin = :builtin WHERE builtin IS NULL AND name IN (:names)")
+        .param("builtin", builtin)
+        .param("names", names)
+        .update();
   }
 
   public boolean delete(long userId, long id) {

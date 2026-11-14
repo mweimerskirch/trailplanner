@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.util.List;
+import java.util.Locale;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -32,20 +33,23 @@ public class PresetController {
   }
 
   @GetMapping
-  public List<Preset> list(CurrentUser user) {
-    return presets.list(user);
+  public List<Preset> list(CurrentUser user, Locale locale) {
+    return presets.list(user, locale);
   }
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)
-  public Preset create(CurrentUser user, @Valid @RequestBody PresetRequest request) {
-    return presets.create(user, request.name(), request.preferences());
+  public Preset create(CurrentUser user, @Valid @RequestBody PresetRequest request, Locale locale) {
+    return presets.create(user, request.name(), request.preferences(), locale);
   }
 
   @PutMapping("/{id}")
   public Preset update(
-      CurrentUser user, @PathVariable long id, @Valid @RequestBody PresetRequest request) {
-    return presets.update(user, id, request.name(), request.preferences());
+      CurrentUser user,
+      @PathVariable long id,
+      @Valid @RequestBody PresetRequest request,
+      Locale locale) {
+    return presets.update(user, id, request.name(), request.preferences(), locale);
   }
 
   @DeleteMapping("/{id}")

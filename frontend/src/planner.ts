@@ -1,6 +1,7 @@
 import { computed, nextTick, ref, shallowRef, toRaw, watch } from 'vue'
 import { api, ApiError } from './api'
-import { ACTIVITIES, activityInfo, DEFAULT_PREFERENCES } from './constants'
+import { ACTIVITIES, activityInfo, DEFAULT_PREFERENCES, isDefaultRouteName } from './constants'
+import { i18n, t } from './i18n'
 import type {
   Activity,
   GeoPoint,
@@ -99,7 +100,7 @@ let storageKey: string | null = null
 
 export const waypoints = ref<Waypoint[]>([])
 export const preferences = ref<RoutingPreferences>(mergePreferences(undefined))
-export const routeName = ref('MTB tour')
+export const routeName = ref(activityInfo('MTB').routeName)
 /** Id of the saved route being edited, or null for a new, unsaved route. */
 export const routeId = ref<number | null>(null)
 /** The open route's updatedAt as last loaded or saved; sent with saves to detect conflicts. */
@@ -154,15 +155,11 @@ interface Snapshot {
   fixedTrack: FixedTrack | null
 }
 
-// A default route name follows the activity ("MTB tour" becomes "Road ride"); own names stay.
-watch(
-  () => preferences.value.activity,
-  (activity) => {
-    if (ACTIVITIES.some((a) => a.routeName === routeName.value)) {
-      routeName.value = activityInfo(activity).routeName
-    }
-  },
-)
+// A default route name follows the activity ("MTB tour" becomes "Road ride") and the language
+// ("Sortie VTT"); own names stay.
+watch([() => preferences.value.activity, i18n.global.locale], ([activity]) => {
+  if (isDefaultRouteName(routeName.value)) routeName.value = activityInfo(activity).routeName
+})
 
 const history = createHistory<Snapshot>(MAX_HISTORY)
 export const canUndo = ref(false)
@@ -266,7 +263,7 @@ function applyQuietly(change: () => void) {
 /** Applies a change to the waypoint list (as a new list, so watchers see it). */
 function edit(change: (points: Waypoint[]) => Waypoint[], recordHistory = true) {
   if (fixedTrack.value) {
-    setStatus('This route was imported. Press “Edit route” to change it.', 'info', 4000)
+    setStatus(t('planner.status.importedReadOnly'), 'info', 4000)
     return
   }
   if (recordHistory) remember()
@@ -375,27 +372,25 @@ export async function editImportedRoute() {
   const id = routeId.value
   if (!track || id === null || converting.value) return
   converting.value = true
-  setStatus('Matching the original track with the router…')
+  setStatus(t('planner.status.matching'))
   try {
     const result = await api.convertRoute(id, preferences.value)
     remember()
     fixedTrack.value = null
     waypoints.value = result.waypoints
-    const notes = [
+    const n = result.waypoints.length
+    const sentences = [
+      t('planner.status.converted', { n }, n),
       result.forcedLegs > 0
-        ? `${String(result.forcedLegs)} leg${result.forcedLegs === 1 ? ' uses' : 's use'} closed or restricted ways (orange, see the warnings)`
+        ? t('planner.status.forcedLegs', { n: result.forcedLegs }, result.forcedLegs)
         : '',
       result.straightLegs > 0
-        ? `${String(result.straightLegs)} straight line${result.straightLegs === 1 ? '' : 's'} where no way exists (dotted)`
+        ? t('planner.status.straightLegs', { n: result.straightLegs }, result.straightLegs)
         : '',
     ].filter(Boolean)
-    setStatus(
-      `Converted to ${String(result.waypoints.length)} waypoints${notes.length ? `; ${notes.join(', ')}` : ''}. Save to keep it.`,
-      'info',
-      10000,
-    )
+    setStatus(sentences.join(' '), 'info', 10000)
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Converting the route failed.', 'error')
+    setStatus(error instanceof Error ? error.message : t('planner.status.convertFailed'), 'error')
   } finally {
     converting.value = false
   }
@@ -419,9 +414,9 @@ export async function revertToOriginal() {
   if (id === null) return
   try {
     openRoute(await api.revertRoute(id))
-    setStatus('Back to the original track.', 'info', 3000)
+    setStatus(t('planner.status.backToOriginal'), 'info', 3000)
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Could not restore the original.', 'error')
+    setStatus(error instanceof Error ? error.message : t('planner.status.restoreFailed'), 'error')
   }
 }
 
@@ -434,13 +429,13 @@ export async function toggleFavorite() {
     favorite.value = route.favorite
     libraryVersion.value++
   } catch (error) {
-    setStatus(error instanceof Error ? error.message : 'Could not change the favorite.', 'error')
+    setStatus(error instanceof Error ? error.message : t('planner.status.favoriteFailed'), 'error')
   }
 }
 
 export function draft(): RouteDraft {
   return {
-    name: routeName.value.trim() || 'Route',
+    name: routeName.value.trim() || t('common.route'),
     waypoints: waypoints.value,
     preferences: preferences.value,
   }
@@ -501,7 +496,7 @@ async function recalculate() {
     return
   }
 
-  routingStatus = 'Calculating route…'
+  routingStatus = t('planner.status.calculating')
   setStatus(routingStatus)
   const worker = async () => {
     for (let i = todo.shift(); i !== undefined; i = todo.shift()) {
@@ -521,7 +516,10 @@ async function recalculate() {
         state = { status: 'ok', leg }
       } catch (error) {
         if (signal.aborted) return
-        state = { status: 'error', message: error instanceof ApiError ? error.message : 'Routing failed.' }
+        state = {
+          status: 'error',
+          message: error instanceof ApiError ? error.message : t('planner.status.routingFailed'),
+        }
       }
       if (run !== generation) return
       const copy = [...legs.value]

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import { km } from '@/format'
 
 export interface BreakdownItem {
   label: string
@@ -27,7 +28,7 @@ const rows = computed(() =>
       <li v-for="row in rows" :key="row.label">
         <span class="swatch" :style="{ background: row.color }" />
         {{ row.label }}
-        <span class="value">{{ (row.metres / 1000).toFixed(1) }} km · {{ Math.round(row.percent) }}%</span>
+        <span class="value">{{ km(row.metres) }} km · {{ Math.round(row.percent) }}%</span>
       </li>
     </ul>
   </div>

@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, useTemplateRef, watch } from 'vue'
+import { km, num } from '@/format'
+import { i18n, t } from '@/i18n'
 import type { ProfilePoint } from '@/profile'
 
 /**
  * Elevation over distance. Pointing at the chart sets the hovered point (v-model:hover-index), so
  * the map can mark it; a point hovered elsewhere is marked here.
  */
-const props = withDefaults(defineProps<{ points: ProfilePoint[]; label?: string }>(), {
-  label: 'Elevation profile of the route',
-})
+const props = defineProps<{ points: ProfilePoint[]; label?: string }>()
 const hoverIndex = defineModel<number | null>('hoverIndex', { default: null })
 
 const canvas = useTemplateRef<HTMLCanvasElement>('canvas')
@@ -18,7 +18,7 @@ let resizeObserver: ResizeObserver | null = null
 const tooltip = computed(() => {
   const p = hoverIndex.value === null ? undefined : props.points[hoverIndex.value]
   if (!p) return ''
-  return `${(p.distance / 1000).toFixed(2)} km · ${p.ele === null ? '–' : `${Math.round(p.ele)} m`}`
+  return `${km(p.distance, 2)} km · ${p.ele === null ? '–' : `${num(p.ele)} m`}`
 })
 
 function cssVar(name: string) {
@@ -67,10 +67,10 @@ function draw() {
     ctx.moveTo(PAD.left, y(v))
     ctx.lineTo(width - PAD.right, y(v))
     ctx.stroke()
-    ctx.fillText(`${Math.round(v)} m`, 4, y(v) + 4)
+    ctx.fillText(`${num(v)} m`, 4, y(v) + 4)
   }
   ctx.fillText('0', PAD.left, height - 5)
-  const label = `${(total / 1000).toFixed(1)} km`
+  const label = `${km(total)} km`
   ctx.fillText(label, width - PAD.right - ctx.measureText(label).width, height - 5)
 
   ctx.beginPath()
@@ -126,7 +126,8 @@ function onPointerLeave() {
   hoverIndex.value = null
 }
 
-watch([() => props.points, hoverIndex], draw)
+// The axis labels use the language's number format.
+watch([() => props.points, hoverIndex, i18n.global.locale], draw)
 onMounted(() => {
   if (canvas.value) {
     resizeObserver = new ResizeObserver(draw)
@@ -137,7 +138,7 @@ onBeforeUnmount(() => resizeObserver?.disconnect())
 </script>
 
 <template>
-  <div class="elevation" role="img" :aria-label="label">
+  <div class="elevation" role="img" :aria-label="label ?? t('planner.elevation.label')">
     <canvas ref="canvas" @pointermove="onPointerMove" @pointerleave="onPointerLeave" />
     <div class="tip">{{ tooltip }}</div>
   </div>

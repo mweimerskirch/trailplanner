@@ -2,94 +2,102 @@ import type {
   Activity,
   PreferenceLevel,
   RoutingPreferences,
+  RouteWarning,
   Surface,
   TrailDifficulty,
   WayCategory,
   WoodsPreference,
 } from './types'
+import { allTranslations, i18n, t } from './i18n'
+
+/*
+ * Labels are getters that read the current language, so lists defined here follow a language
+ * change wherever they are rendered.
+ */
 
 export interface CategoryInfo {
   key: WayCategory
-  label: string
-  hint: string
+  readonly label: string
+  readonly hint: string
   color: string
-  /** Label and hint for activities where the mountain-bike wording does not fit. */
-  for?: Partial<Record<Activity, { label: string; hint: string }>>
+  /** Activities with their own wording for this category (message key `<KEY>_<ACTIVITY>`). */
+  ownWording?: readonly Activity[]
   /** Activities whose routing ignores this category (no slider is shown). */
   hiddenFor?: readonly Activity[]
 }
 
 export interface ActivityInfo {
   value: Activity
-  label: string
+  readonly label: string
   /** Default average speed on the flat in km/h, for the time estimate. */
   speed: number
   /** Name of a new route. */
-  routeName: string
+  readonly routeName: string
 }
 
-const MOUNTAIN_BIKE: ActivityInfo = { value: 'MTB', label: 'Mountain bike', speed: 16, routeName: 'MTB tour' }
+function activity(value: Activity, speed: number): ActivityInfo {
+  return {
+    value,
+    speed,
+    get label() {
+      return t(`routing.activity.${value}.label`)
+    },
+    get routeName() {
+      return t(`routing.activity.${value}.routeName`)
+    },
+  }
+}
 
-export const ACTIVITIES: readonly ActivityInfo[] = [
-  MOUNTAIN_BIKE,
-  { value: 'ROAD', label: 'Road bike', speed: 25, routeName: 'Road ride' },
-  { value: 'HORSE', label: 'Horseback', speed: 7, routeName: 'Horse ride' },
-]
+const MOUNTAIN_BIKE = activity('MTB', 16)
+
+export const ACTIVITIES: readonly ActivityInfo[] = [MOUNTAIN_BIKE, activity('ROAD', 25), activity('HORSE', 7)]
 
 export function activityInfo(activity: Activity): ActivityInfo {
   return ACTIVITIES.find((a) => a.value === activity) ?? MOUNTAIN_BIKE
 }
 
-export const CATEGORIES: readonly CategoryInfo[] = [
-  {
-    key: 'TRAIL',
-    label: 'Singletrails & paths',
-    hint: 'path, bridleway',
-    color: '#7B3FA0',
-    for: {
-      ROAD: {
-        label: 'Paved paths',
-        hint: 'path, bridleway (shared foot and cycle paths count as cycleways)',
-      },
-      HORSE: { label: 'Bridleways & paths', hint: 'bridleway, path' },
+/** The default name of a new route for any activity, in any language. */
+export function isDefaultRouteName(name: string): boolean {
+  return ACTIVITIES.some((a) => allTranslations(`routing.activity.${a.value}.routeName`).includes(name))
+}
+
+type CategoryKey =
+  WayCategory | 'TRAIL_ROAD' | 'TRAIL_HORSE' | 'GRAVEL_TRACK_ROAD' | 'FOOTWAY_HORSE' | 'CYCLEWAY_HORSE'
+
+function category(
+  key: WayCategory,
+  color: string,
+  options: { ownWording?: readonly Activity[]; hiddenFor?: readonly Activity[] } = {},
+): CategoryInfo {
+  return {
+    key,
+    color,
+    ...options,
+    get label() {
+      return t(`routing.category.${key}.label`)
     },
-  },
-  {
-    key: 'ROUGH_TRACK',
-    label: 'Rough forest tracks',
-    hint: 'track, grade 3–5 or unknown',
-    color: '#6B4F3A',
-    hiddenFor: ['ROAD'],
-  },
-  {
-    key: 'GRAVEL_TRACK',
-    label: 'Gravel forest roads',
-    hint: 'track, grade 1–2',
-    color: '#B8923F',
-    for: { ROAD: { label: 'Farm & forest roads', hint: 'track, grade 1–2, where paved or compacted' } },
-  },
-  {
-    key: 'FOOTWAY',
-    label: 'Footways',
-    hint: 'footway, pedestrian, steps',
-    color: '#3F8A75',
-    for: { HORSE: { label: 'Footways', hint: 'footway, pedestrian; only where horses are allowed' } },
-  },
-  {
-    key: 'CYCLEWAY',
-    label: 'Cycleways',
-    hint: 'cycleway',
-    color: '#2E6FB0',
-    for: { HORSE: { label: 'Cycleways', hint: 'cycleway; only where horses are allowed' } },
-  },
-  { key: 'QUIET_ROAD', label: 'Quiet roads', hint: 'residential, service, unclassified', color: '#8C968F' },
-  { key: 'MAIN_ROAD', label: 'Main roads', hint: 'secondary, tertiary', color: '#D9822B' },
-  { key: 'BUSY_ROAD', label: 'Busy roads', hint: 'primary, trunk', color: '#B3261E' },
+    get hint() {
+      return t(`routing.category.${key}.hint`)
+    },
+  }
+}
+
+export const CATEGORIES: readonly CategoryInfo[] = [
+  category('TRAIL', '#7B3FA0', { ownWording: ['ROAD', 'HORSE'] }),
+  category('ROUGH_TRACK', '#6B4F3A', { hiddenFor: ['ROAD'] }),
+  category('GRAVEL_TRACK', '#B8923F', { ownWording: ['ROAD'] }),
+  category('FOOTWAY', '#3F8A75', { ownWording: ['HORSE'] }),
+  category('CYCLEWAY', '#2E6FB0', { ownWording: ['HORSE'] }),
+  category('QUIET_ROAD', '#8C968F'),
+  category('MAIN_ROAD', '#D9822B'),
+  category('BUSY_ROAD', '#B3261E'),
 ]
 
 /** A category's label and hint for an activity. */
 export function categoryText(category: CategoryInfo, activity: Activity): { label: string; hint: string } {
-  return category.for?.[activity] ?? category
+  if (!category.ownWording?.includes(activity)) return { label: category.label, hint: category.hint }
+  const key = `${category.key}_${activity}` as CategoryKey
+  return { label: t(`routing.category.${key}.label`), hint: t(`routing.category.${key}.hint`) }
 }
 
 /** The categories the activity's routing uses. */
@@ -97,39 +105,51 @@ export function categoriesFor(activity: Activity): readonly CategoryInfo[] {
   return CATEGORIES.filter((c) => !c.hiddenFor?.includes(activity))
 }
 
-export const OTHER_WAYS = { label: 'Other', color: '#BFC6BD' }
+export const OTHER_WAYS = {
+  get label() {
+    return t('routing.category.OTHER.label')
+  },
+  color: '#BFC6BD',
+}
 
 export const LEVELS: readonly PreferenceLevel[] = ['NEVER', 'AVOID', 'NEUTRAL', 'PREFER', 'FAVOURITE']
 
-export const LEVEL_LABELS: Record<PreferenceLevel, string> = {
-  NEVER: 'Never',
-  AVOID: 'Avoid',
-  NEUTRAL: 'Neutral',
-  PREFER: 'Prefer',
-  FAVOURITE: 'Favourite',
+export const levelLabel = (level: PreferenceLevel) => t(`routing.level.${level}`)
+
+function labelled<T extends string>(value: T, key: () => string): { value: T; readonly label: string } {
+  return {
+    value,
+    get label() {
+      return key()
+    },
+  }
 }
 
-export const DIFFICULTIES: readonly { value: TrailDifficulty; label: string }[] = [
-  { value: 'S0', label: 'S0 – flowing, no obstacles' },
-  { value: 'S1', label: 'S1 – small roots and rocks' },
-  { value: 'S2', label: 'S2 – bigger roots, steps' },
-  { value: 'S3', label: 'S3 – blocky, switchbacks' },
-  { value: 'S4', label: 'S4 – very steep, technical' },
-  { value: 'S5', label: 'S5 – extreme' },
-  { value: 'ANY', label: 'No limit' },
-]
+const DIFFICULTY_VALUES: readonly TrailDifficulty[] = ['S0', 'S1', 'S2', 'S3', 'S4', 'S5', 'ANY']
 
-export const WOODS_OPTIONS: readonly { value: WoodsPreference; label: string }[] = [
-  { value: 'INDIFFERENT', label: 'Don’t care' },
-  { value: 'PREFER', label: 'Prefer riding through woods' },
-  { value: 'STRONGLY_PREFER', label: 'Strongly prefer woods' },
-]
+export const DIFFICULTIES = DIFFICULTY_VALUES.map((d) => labelled(d, () => t(`routing.difficulty.${d}`)))
 
-export const SURFACES: readonly { key: Surface; label: string; color: string }[] = [
-  { key: 'UNPAVED', label: 'Unpaved', color: '#8A6A3F' },
-  { key: 'PAVED', label: 'Paved', color: '#5F6B73' },
-  { key: 'UNKNOWN', label: 'Surface unknown', color: '#C9CFC6' },
-]
+const WOODS_VALUES: readonly WoodsPreference[] = ['INDIFFERENT', 'PREFER', 'STRONGLY_PREFER']
+
+export const WOODS_OPTIONS = WOODS_VALUES.map((w) => labelled(w, () => t(`routing.woods.${w}`)))
+
+const SURFACE_COLORS: Record<Surface, string> = { UNPAVED: '#8A6A3F', PAVED: '#5F6B73', UNKNOWN: '#C9CFC6' }
+
+export const SURFACES: readonly { key: Surface; readonly label: string; color: string }[] = (
+  Object.keys(SURFACE_COLORS) as Surface[]
+).map((key) => ({
+  key,
+  color: SURFACE_COLORS[key],
+  get label() {
+    return t(`routing.surface.${key}`)
+  },
+}))
+
+/** A warning's reason in the chosen language; the server's English text for unknown codes. */
+export function warningText(warning: RouteWarning): string {
+  const key = `routing.warning.${warning.code ?? ''}`
+  return warning.code && i18n.global.te(key) ? t(key) : warning.reason
+}
 
 export const DEFAULT_PREFERENCES: RoutingPreferences = {
   levels: {

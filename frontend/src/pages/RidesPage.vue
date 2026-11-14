@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRouter } from 'vue-router'
 import { api } from '@/api'
 import IconButton from '@/components/atoms/IconButton.vue'
@@ -8,7 +9,7 @@ import StatusMessage from '@/components/molecules/StatusMessage.vue'
 import RideImportButton from '@/components/organisms/RideImportButton.vue'
 import PageLayout from '@/components/templates/PageLayout.vue'
 import { askConfirm } from '@/confirm'
-import { duration, km, kmh, rideTime } from '@/format'
+import { duration, km, kmh, num, rideTime } from '@/format'
 import * as planner from '@/planner'
 import type { RideSummary } from '@/types'
 
@@ -33,6 +34,7 @@ const COMPARE: Record<SortKey, (a: RideSummary, b: RideSummary) => number> = {
 }
 
 const router = useRouter()
+const { t } = useI18n()
 const rides = ref<RideSummary[]>([])
 const loading = ref(true)
 const failed = ref(false)
@@ -110,19 +112,18 @@ async function upload(event: Event) {
     const imported = results.filter((r) => r.status === 'IMPORTED').length
     const problems = results.filter((r) => r.status === 'FAILED')
     const already = results.length - imported - problems.length
+    const failedText = problems
+      .map((p) => `${p.fileName}: ${p.message ?? t('rides.upload.notReadable')}`)
+      .join('; ')
     const parts = [
-      `Imported ${String(imported)} ride${imported === 1 ? '' : 's'}`,
-      already ? `${String(already)} already imported` : '',
+      t('rides.upload.imported', { n: imported }, imported),
+      already ? t('rides.upload.already', { n: already }, already) : '',
+      failedText ? t('rides.upload.notImported', { list: failedText }) : '',
     ].filter(Boolean)
-    const failedText = problems.map((p) => `${p.fileName}: ${p.message ?? 'not readable'}`).join('; ')
-    planner.setStatus(
-      `${parts.join(', ')}.${failedText ? ` Not imported: ${failedText}` : ''}`,
-      problems.length ? 'error' : 'info',
-      problems.length ? 0 : 5000,
-    )
+    planner.setStatus(parts.join(' '), problems.length ? 'error' : 'info', problems.length ? 0 : 5000)
     await load()
   } catch (error) {
-    planner.setStatus(error instanceof Error ? error.message : 'The upload failed.', 'error')
+    planner.setStatus(error instanceof Error ? error.message : t('rides.upload.failed'), 'error')
   } finally {
     uploading.value = false
   }
@@ -130,11 +131,9 @@ async function upload(event: Event) {
 
 async function remove(r: RideSummary) {
   const ok = await askConfirm({
-    title: `Delete “${r.name}”?`,
-    message:
-      'The ride is deleted from Trailplan, not from the device. Importing from the device will not ' +
-      'bring it back; uploading its FIT file will.',
-    confirmLabel: 'Delete ride',
+    title: t('rides.confirmDelete.title', { name: r.name }),
+    message: t('rides.confirmDelete.message'),
+    confirmLabel: t('rides.confirmDelete.confirm'),
     danger: true,
   })
   if (!ok) return
@@ -142,7 +141,7 @@ async function remove(r: RideSummary) {
     await api.deleteRide(r.id)
     rides.value = rides.value.filter((x) => x.id !== r.id)
   } catch (error) {
-    planner.setStatus(error instanceof Error ? error.message : 'Could not delete the ride.', 'error')
+    planner.setStatus(error instanceof Error ? error.message : t('rides.error.delete'), 'error')
   }
 }
 
@@ -155,12 +154,12 @@ onMounted(load)
   <PageLayout>
     <div class="toolbar">
       <h1>
-        Rides <span v-if="rides.length" class="count">{{ rides.length }}</span>
+        {{ t('rides.title') }} <span v-if="rides.length" class="count">{{ rides.length }}</span>
       </h1>
       <div class="actions">
         <RideImportButton @imported="load" />
         <button type="button" class="primary" :disabled="uploading" @click="fileInput?.click()">
-          {{ uploading ? 'Importing…' : 'Import FIT files…' }}
+          {{ uploading ? t('rides.importing') : t('rides.importFiles') }}
         </button>
         <input
           ref="fileInput"
@@ -168,7 +167,7 @@ onMounted(load)
           accept=".fit"
           multiple
           hidden
-          aria-label="FIT files of recorded rides"
+          :aria-label="t('rides.filesLabel')"
           @change="upload"
         />
       </div>
@@ -176,42 +175,49 @@ onMounted(load)
 
     <StatusMessage :message="planner.status.value" />
 
-    <p v-if="loading" class="empty">Loading…</p>
-    <p v-else-if="failed" class="empty">The rides are unavailable. Is the backend running?</p>
+    <p v-if="loading" class="empty">{{ t('common.loading') }}</p>
+    <p v-else-if="failed" class="empty">{{ t('rides.unavailable') }}</p>
     <div v-else-if="rides.length === 0" class="blank">
-      <p>
-        No rides yet. Connect your ELEMNT over USB and import the rides it recorded, or import FIT files of
-        recorded rides.
-      </p>
+      <p>{{ t('rides.none') }}</p>
     </div>
     <template v-else>
       <div class="filters">
-        <input v-model="query" type="search" placeholder="Search rides" aria-label="Search rides by name" />
+        <input
+          v-model="query"
+          type="search"
+          :placeholder="t('rides.search')"
+          :aria-label="t('rides.searchLabel')"
+        />
         <p class="totals">
-          {{ km(totals.distance) }} km · {{ duration(totals.moving) }} ·
-          {{ Math.round(totals.ascent).toLocaleString() }} m climbing
+          {{
+            t('rides.totals', {
+              distance: km(totals.distance),
+              moving: duration(totals.moving),
+              ascent: num(totals.ascent),
+            })
+          }}
         </p>
       </div>
-      <p v-if="visible.length === 0" class="empty">No ride matches “{{ query }}”.</p>
+      <p v-if="visible.length === 0" class="empty">{{ t('rides.noMatch', { query }) }}</p>
       <table v-else class="rides">
         <thead>
           <tr>
             <SortableHeader
-              label="Date"
+              :label="t('rides.column.date')"
               column="date"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
             <SortableHeader
-              label="Name"
+              :label="t('rides.column.name')"
               column="name"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
             <SortableHeader
-              label="Distance"
+              :label="t('rides.column.distance')"
               column="distance"
               numeric
               :sort-key="sort.key"
@@ -219,7 +225,7 @@ onMounted(load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Moving time"
+              :label="t('rides.column.moving')"
               column="moving"
               numeric
               :sort-key="sort.key"
@@ -227,7 +233,7 @@ onMounted(load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Climbing"
+              :label="t('rides.column.ascent')"
               column="ascent"
               numeric
               :sort-key="sort.key"
@@ -235,7 +241,7 @@ onMounted(load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Avg speed"
+              :label="t('rides.column.speed')"
               column="speed"
               numeric
               class="hide-narrow"
@@ -243,7 +249,9 @@ onMounted(load)
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
+            <th scope="col">
+              <span class="visually-hidden">{{ t('rides.column.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -252,17 +260,24 @@ onMounted(load)
               {{ date(r) }} <span class="time">{{ time(r) }}</span>
             </td>
             <td class="name-cell">
-              <button type="button" class="name" :title="`Show ${r.name}`" @click="open(r)">
+              <button
+                type="button"
+                class="name"
+                :title="t('rides.showRide', { name: r.name })"
+                @click="open(r)"
+              >
                 {{ r.name }}
               </button>
             </td>
-            <td class="num">{{ km(r.distance) }} km</td>
+            <td class="num">{{ km(r.distance) }} {{ t('common.unit.km') }}</td>
             <td class="num">{{ duration(r.moving) }}</td>
-            <td class="num">{{ Math.round(r.ascent) }} m</td>
-            <td class="num hide-narrow">{{ r.avgSpeed === null ? '–' : `${kmh(r.avgSpeed)} km/h` }}</td>
+            <td class="num">{{ num(r.ascent) }} {{ t('common.unit.m') }}</td>
+            <td class="num hide-narrow">
+              {{ r.avgSpeed === null ? '–' : `${kmh(r.avgSpeed)} ${t('common.unit.kmh')}` }}
+            </td>
             <td class="actions">
-              <button type="button" @click="open(r)">Show</button>
-              <IconButton :label="`Delete ${r.name}`" @click="remove(r)">✕</IconButton>
+              <button type="button" @click="open(r)">{{ t('rides.show') }}</button>
+              <IconButton :label="t('rides.deleteRide', { name: r.name })" @click="remove(r)">✕</IconButton>
             </td>
           </tr>
         </tbody>

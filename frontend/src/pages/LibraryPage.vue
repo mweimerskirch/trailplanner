@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { useRoute, useRouter } from 'vue-router'
 import { api } from '@/api'
 import Badge from '@/components/atoms/Badge.vue'
@@ -13,16 +14,13 @@ import ImportDialog from '@/components/organisms/ImportDialog.vue'
 import PageLayout from '@/components/templates/PageLayout.vue'
 import { askConfirm } from '@/confirm'
 import { saveFile } from '@/files'
+import { day, km, num } from '@/format'
 import * as planner from '@/planner'
 import type { RouteSource, RouteSummary } from '@/types'
 
-const SOURCE_LABELS: Record<RouteSource, string> = {
-  PLANNER: 'Planned',
-  GPX: 'GPX file',
-  FIT: 'FIT file',
-  KOMOOT: 'Komoot',
-  RIDE: 'Ride',
-}
+const { t } = useI18n()
+
+const sourceLabel = (source: RouteSource) => t(`library.source.${source}`)
 
 type SortKey = 'updated' | 'name' | 'distance' | 'ascent' | 'source' | 'archived'
 type SortDir = 'asc' | 'desc'
@@ -41,7 +39,7 @@ const COMPARE: Record<SortKey, (a: RouteSummary, b: RouteSummary) => number> = {
   name: (a, b) => a.name.localeCompare(b.name),
   distance: (a, b) => a.distance - b.distance,
   ascent: (a, b) => a.ascent - b.ascent,
-  source: (a, b) => SOURCE_LABELS[a.source].localeCompare(SOURCE_LABELS[b.source]),
+  source: (a, b) => sourceLabel(a.source).localeCompare(sourceLabel(b.source)),
   archived: (a, b) => (a.archivedAt ?? '').localeCompare(b.archivedAt ?? ''),
 }
 type SourceFilter = 'all' | 'favorites' | 'planned' | 'imported'
@@ -152,19 +150,22 @@ async function load() {
   }
 }
 
-async function act(task: () => Promise<void>, failure: string) {
+async function act(task: () => Promise<void>, failure: () => string) {
   try {
     await task()
   } catch (error) {
-    planner.setStatus(error instanceof Error ? error.message : failure, 'error')
+    planner.setStatus(error instanceof Error ? error.message : failure(), 'error')
   }
 }
 
 const open = (id: number) =>
-  act(async () => {
-    planner.openRoute(await api.getRoute(id))
-    await router.push(`/routes/${String(id)}`)
-  }, 'Could not open the route.')
+  act(
+    async () => {
+      planner.openRoute(await api.getRoute(id))
+      await router.push(`/routes/${String(id)}`)
+    },
+    () => t('library.error.open'),
+  )
 
 async function startRename(route: RouteSummary) {
   renamingId.value = route.id
@@ -174,120 +175,147 @@ async function startRename(route: RouteSummary) {
 }
 
 const finishRename = (route: RouteSummary) =>
-  act(async () => {
-    const name = renameText.value.trim()
-    if (renamingId.value !== route.id) return
-    renamingId.value = null
-    if (!name || name === route.name) return
-    const renamed = await api.renameRoute(route.id, name)
-    if (planner.routeId.value === route.id) planner.routeName.value = renamed.name
-    planner.libraryVersion.value++
-  }, 'Could not rename the route.')
+  act(
+    async () => {
+      const name = renameText.value.trim()
+      if (renamingId.value !== route.id) return
+      renamingId.value = null
+      if (!name || name === route.name) return
+      const renamed = await api.renameRoute(route.id, name)
+      if (planner.routeId.value === route.id) planner.routeName.value = renamed.name
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.rename'),
+  )
 
 const duplicate = (route: RouteSummary) =>
-  act(async () => {
-    const copy = await api.duplicateRoute(route.id)
-    planner.setStatus(`Created “${copy.name}”.`, 'info', 2500)
-    planner.libraryVersion.value++
-  }, 'Could not duplicate the route.')
+  act(
+    async () => {
+      const copy = await api.duplicateRoute(route.id)
+      planner.setStatus(t('library.status.duplicated', { name: copy.name }), 'info', 2500)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.duplicate'),
+  )
 
 const download = (route: RouteSummary) =>
-  act(async () => {
-    saveFile(await api.exportSaved(route.id, 'gpx'))
-  }, 'Could not download the route.')
+  act(
+    async () => {
+      saveFile(await api.exportSaved(route.id, 'gpx'))
+    },
+    () => t('library.error.download'),
+  )
 
 const toggleFavorite = (route: RouteSummary) =>
-  act(async () => {
-    const updated = await api.setFavorite(route.id, !route.favorite)
-    if (planner.routeId.value === route.id) planner.favorite.value = updated.favorite
-    planner.libraryVersion.value++
-  }, 'Could not change the favorite.')
+  act(
+    async () => {
+      const updated = await api.setFavorite(route.id, !route.favorite)
+      if (planner.routeId.value === route.id) planner.favorite.value = updated.favorite
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.favorite'),
+  )
 
 const archive = (route: RouteSummary) =>
-  act(async () => {
-    await api.archiveRoute(route.id)
-    planner.setStatus(`Archived “${route.name}”. Find it under Archived.`, 'info', 3000)
-    planner.libraryVersion.value++
-  }, 'Could not archive the route.')
+  act(
+    async () => {
+      await api.archiveRoute(route.id)
+      planner.setStatus(t('library.status.archived', { name: route.name }), 'info', 3000)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.archive'),
+  )
 
 const unarchive = (route: RouteSummary) =>
-  act(async () => {
-    await api.unarchiveRoute(route.id)
-    planner.setStatus(`“${route.name}” is back in your routes.`, 'info', 2500)
-    planner.libraryVersion.value++
-  }, 'Could not unarchive the route.')
+  act(
+    async () => {
+      await api.unarchiveRoute(route.id)
+      planner.setStatus(t('library.status.unarchived', { name: route.name }), 'info', 2500)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.unarchive'),
+  )
 
 const moveToTrash = (route: RouteSummary) =>
-  act(async () => {
-    const ok = await askConfirm({
-      title: 'Move to trash?',
-      message: `“${route.name}” moves to the trash. You can restore it from there until you empty the trash.`,
-      confirmLabel: 'Move to trash',
-    })
-    if (!ok) return
-    await api.deleteRoute(route.id)
-    if (planner.routeId.value === route.id) {
-      // The open route went to the trash: an imported (view-only) one is closed; an edited one
-      // stays in the planner as a new, unsaved route the rider can still keep.
-      if (planner.viewOnly.value) planner.newRoute()
-      else {
-        planner.routeId.value = null
-        planner.routeUpdatedAt.value = null
-        planner.hasOriginal.value = false
+  act(
+    async () => {
+      const ok = await askConfirm({
+        title: t('library.confirm.trash.title'),
+        message: t('library.confirm.trash.message', { name: route.name }),
+        confirmLabel: t('library.confirm.trash.confirm'),
+      })
+      if (!ok) return
+      await api.deleteRoute(route.id)
+      if (planner.routeId.value === route.id) {
+        // The open route went to the trash: an imported (view-only) one is closed; an edited one
+        // stays in the planner as a new, unsaved route the rider can still keep.
+        if (planner.viewOnly.value) planner.newRoute()
+        else {
+          planner.routeId.value = null
+          planner.routeUpdatedAt.value = null
+          planner.hasOriginal.value = false
+        }
       }
-    }
-    planner.setStatus(`Moved “${route.name}” to the trash.`, 'info', 3000)
-    planner.libraryVersion.value++
-  }, 'Could not delete the route.')
+      planner.setStatus(t('library.status.trashed', { name: route.name }), 'info', 3000)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.delete'),
+  )
 
 const restore = (route: RouteSummary) =>
-  act(async () => {
-    await api.restoreRoute(route.id)
-    planner.setStatus(`Restored “${route.name}”.`, 'info', 2500)
-    planner.libraryVersion.value++
-  }, 'Could not restore the route.')
+  act(
+    async () => {
+      await api.restoreRoute(route.id)
+      planner.setStatus(t('library.status.restored', { name: route.name }), 'info', 2500)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.restore'),
+  )
 
 const deleteForever = (route: RouteSummary) =>
-  act(async () => {
-    if (
-      !(await askConfirm({
-        title: 'Delete for good?',
-        message: `“${route.name}” will be deleted permanently. This cannot be undone.`,
-        confirmLabel: 'Delete for good',
-        danger: true,
-      }))
-    ) {
-      return
-    }
-    await api.deleteRoutePermanently(route.id)
-    planner.libraryVersion.value++
-  }, 'Could not delete the route.')
+  act(
+    async () => {
+      if (
+        !(await askConfirm({
+          title: t('library.confirm.deleteForever.title'),
+          message: t('library.confirm.deleteForever.message', { name: route.name }),
+          confirmLabel: t('library.confirm.deleteForever.confirm'),
+          danger: true,
+        }))
+      ) {
+        return
+      }
+      await api.deleteRoutePermanently(route.id)
+      planner.libraryVersion.value++
+    },
+    () => t('library.error.delete'),
+  )
 
 const emptyTrash = () =>
-  act(async () => {
-    const n = trash.value.length
-    if (
-      !(await askConfirm({
-        title: 'Empty the trash?',
-        message: `${String(n)} route${n === 1 ? '' : 's'} in the trash will be deleted permanently. This cannot be undone.`,
-        confirmLabel: 'Empty trash',
-        danger: true,
-      }))
-    ) {
-      return
-    }
-    await api.emptyTrash()
-    planner.libraryVersion.value++
-    setTab('library')
-  }, 'Could not empty the trash.')
+  act(
+    async () => {
+      const n = trash.value.length
+      if (
+        !(await askConfirm({
+          title: t('library.confirm.emptyTrash.title'),
+          message: t('library.confirm.emptyTrash.message', { n }, n),
+          confirmLabel: t('library.confirm.emptyTrash.confirm'),
+          danger: true,
+        }))
+      ) {
+        return
+      }
+      await api.emptyTrash()
+      planner.libraryVersion.value++
+      setTab('library')
+    },
+    () => t('library.error.emptyTrash'),
+  )
 
 function onImported(openId: number | null) {
   planner.libraryVersion.value++
   if (openId !== null) void open(openId)
 }
-
-const km = (m: number) => (m / 1000).toFixed(1)
-const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString() : '')
 
 onMounted(load)
 watch(planner.libraryVersion, load)
@@ -299,64 +327,75 @@ watch(planner.libraryVersion, load)
       <TabBar
         large
         :tabs="[
-          { id: 'library', label: 'Routes', count: routes.length },
-          { id: 'archive', label: 'Archived', count: archived.length },
-          { id: 'trash', label: 'Trash', count: trash.length },
+          { id: 'library', label: t('library.tab.routes'), count: routes.length },
+          { id: 'archive', label: t('library.tab.archived'), count: archived.length },
+          { id: 'trash', label: t('library.tab.trash'), count: trash.length },
         ]"
         :model-value="tab"
         @update:model-value="setTab($event as Tab)"
       />
       <div class="actions">
         <DeviceSyncButton />
-        <button type="button" class="primary" @click="void importDialog?.open()">Import routes…</button>
+        <button type="button" class="primary" @click="void importDialog?.open()">
+          {{ t('library.importRoutes') }}
+        </button>
       </div>
     </div>
 
     <StatusMessage :message="planner.status.value" />
 
-    <p v-if="loading" class="empty">Loading…</p>
-    <p v-else-if="failed" class="empty">The library is unavailable. Is the backend running?</p>
+    <p v-if="loading" class="empty">{{ t('common.loading') }}</p>
+    <p v-else-if="failed" class="empty">{{ t('library.unavailable') }}</p>
 
     <template v-else-if="tab === 'library'">
       <div class="filters">
-        <input v-model="query" type="search" placeholder="Search routes" aria-label="Search routes by name" />
-        <select v-model="sourceFilter" aria-label="Which routes">
-          <option value="all">All routes</option>
-          <option value="favorites">★ Favorites</option>
-          <option value="planned">Planned in Trailplan</option>
-          <option value="imported">Imported</option>
+        <input
+          v-model="query"
+          type="search"
+          :placeholder="t('library.filter.search')"
+          :aria-label="t('library.filter.searchLabel')"
+        />
+        <select v-model="sourceFilter" :aria-label="t('library.filter.which')">
+          <option value="all">{{ t('library.filter.all') }}</option>
+          <option value="favorites">★ {{ t('library.filter.favorites') }}</option>
+          <option value="planned">{{ t('library.filter.planned') }}</option>
+          <option value="imported">{{ t('library.filter.imported') }}</option>
         </select>
-        <select v-model="sortChoice" aria-label="Sort by">
-          <option value="updated:desc">Last changed</option>
-          <option value="updated:asc">Oldest change first</option>
-          <option value="name:asc">Name A–Z</option>
-          <option value="name:desc">Name Z–A</option>
-          <option value="distance:desc">Longest first</option>
-          <option value="distance:asc">Shortest first</option>
-          <option value="ascent:desc">Most climbing first</option>
-          <option value="ascent:asc">Least climbing first</option>
-          <option value="source:asc">Source</option>
+        <select v-model="sortChoice" :aria-label="t('library.sort.label')">
+          <option value="updated:desc">{{ t('library.sort.updatedDesc') }}</option>
+          <option value="updated:asc">{{ t('library.sort.updatedAsc') }}</option>
+          <option value="name:asc">{{ t('library.sort.nameAsc') }}</option>
+          <option value="name:desc">{{ t('library.sort.nameDesc') }}</option>
+          <option value="distance:desc">{{ t('library.sort.distanceDesc') }}</option>
+          <option value="distance:asc">{{ t('library.sort.distanceAsc') }}</option>
+          <option value="ascent:desc">{{ t('library.sort.ascentDesc') }}</option>
+          <option value="ascent:asc">{{ t('library.sort.ascentAsc') }}</option>
+          <option value="source:asc">{{ t('library.column.source') }}</option>
         </select>
       </div>
 
       <div v-if="routes.length === 0" class="blank">
-        <p>No routes yet. Plan one on the map and save it, or import routes from Komoot or GPX/FIT files.</p>
-        <button type="button" class="primary" @click="void importDialog?.open()">Import routes…</button>
+        <p>{{ t('library.blank') }}</p>
+        <button type="button" class="primary" @click="void importDialog?.open()">
+          {{ t('library.importRoutes') }}
+        </button>
       </div>
-      <p v-else-if="visible.length === 0" class="empty">No route matches these filters.</p>
+      <p v-else-if="visible.length === 0" class="empty">{{ t('library.noMatch') }}</p>
       <table v-else class="routes">
         <thead>
           <tr>
-            <th scope="col" class="star-col"><span class="visually-hidden">Favorite</span></th>
+            <th scope="col" class="star-col">
+              <span class="visually-hidden">{{ t('common.favorite') }}</span>
+            </th>
             <SortableHeader
-              label="Name"
+              :label="t('library.column.name')"
               column="name"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
             <SortableHeader
-              label="Distance"
+              :label="t('library.column.distance')"
               column="distance"
               numeric
               :sort-key="sort.key"
@@ -364,7 +403,7 @@ watch(planner.libraryVersion, load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Climbing"
+              :label="t('library.column.climbing')"
               column="ascent"
               numeric
               :sort-key="sort.key"
@@ -372,7 +411,7 @@ watch(planner.libraryVersion, load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Source"
+              :label="t('library.column.source')"
               column="source"
               class="hide-narrow"
               :sort-key="sort.key"
@@ -380,14 +419,16 @@ watch(planner.libraryVersion, load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Changed"
+              :label="t('library.column.changed')"
               column="updated"
               class="hide-narrow"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
+            <th scope="col">
+              <span class="visually-hidden">{{ t('library.column.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -402,7 +443,7 @@ watch(planner.libraryVersion, load)
                 v-model="renameText"
                 type="text"
                 maxlength="120"
-                aria-label="New name"
+                :aria-label="t('library.newName')"
                 @keydown.enter.prevent="finishRename(r)"
                 @keydown.esc.prevent="renamingId = null"
                 @blur="finishRename(r)"
@@ -411,26 +452,36 @@ watch(planner.libraryVersion, load)
                 v-else
                 type="button"
                 class="name"
-                :title="`Open ${r.name} in the planner`"
+                :title="t('library.row.open', { name: r.name })"
                 @click="open(r.id)"
               >
                 {{ r.name }}
               </button>
-              <Badge v-if="!r.editable" class="original" title="Imported track, not edited yet"
-                >original track</Badge
-              >
+              <Badge v-if="!r.editable" class="original" :title="t('library.originalTitle')">{{
+                t('library.original')
+              }}</Badge>
             </td>
-            <td class="num">{{ km(r.distance) }} km</td>
-            <td class="num">{{ Math.round(r.ascent) }} m</td>
-            <td class="hide-narrow">{{ SOURCE_LABELS[r.source] }}</td>
+            <td class="num">{{ km(r.distance) }} {{ t('common.unit.km') }}</td>
+            <td class="num">{{ num(Math.round(r.ascent)) }} {{ t('common.unit.m') }}</td>
+            <td class="hide-narrow">{{ sourceLabel(r.source) }}</td>
             <td class="hide-narrow">{{ day(r.updatedAt) }}</td>
             <td class="actions">
-              <button type="button" @click="open(r.id)">Open</button>
-              <IconButton :label="`Download ${r.name} as GPX`" @click="download(r)">GPX</IconButton>
-              <IconButton :label="`Rename ${r.name}`" @click="startRename(r)">✎</IconButton>
-              <IconButton :label="`Duplicate ${r.name}`" @click="duplicate(r)">⧉</IconButton>
-              <IconButton :label="`Archive ${r.name}`" @click="archive(r)">Archive</IconButton>
-              <IconButton :label="`Move ${r.name} to the trash`" @click="moveToTrash(r)">✕</IconButton>
+              <button type="button" @click="open(r.id)">{{ t('common.action.open') }}</button>
+              <IconButton :label="t('library.row.download', { name: r.name })" @click="download(r)"
+                >GPX</IconButton
+              >
+              <IconButton :label="t('library.row.rename', { name: r.name })" @click="startRename(r)"
+                >✎</IconButton
+              >
+              <IconButton :label="t('library.row.duplicate', { name: r.name })" @click="duplicate(r)"
+                >⧉</IconButton
+              >
+              <IconButton :label="t('library.row.archive', { name: r.name })" @click="archive(r)">{{
+                t('common.action.archive')
+              }}</IconButton>
+              <IconButton :label="t('library.row.trash', { name: r.name })" @click="moveToTrash(r)"
+                >✕</IconButton
+              >
             </td>
           </tr>
         </tbody>
@@ -439,21 +490,23 @@ watch(planner.libraryVersion, load)
 
     <template v-else-if="tab === 'archive'">
       <p class="empty">
-        Routes you no longer want in your list, kept for good. The trash never touches them.
+        {{ t('library.archiveIntro') }}
       </p>
       <table v-if="archived.length" class="routes">
         <thead>
           <tr>
-            <th scope="col" class="star-col"><span class="visually-hidden">Favorite</span></th>
+            <th scope="col" class="star-col">
+              <span class="visually-hidden">{{ t('common.favorite') }}</span>
+            </th>
             <SortableHeader
-              label="Name"
+              :label="t('library.column.name')"
               column="name"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
             <SortableHeader
-              label="Distance"
+              :label="t('library.column.distance')"
               column="distance"
               numeric
               :sort-key="sort.key"
@@ -461,7 +514,7 @@ watch(planner.libraryVersion, load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Climbing"
+              :label="t('library.column.climbing')"
               column="ascent"
               numeric
               :sort-key="sort.key"
@@ -469,14 +522,16 @@ watch(planner.libraryVersion, load)
               @sort="sortBy"
             />
             <SortableHeader
-              label="Archived"
+              :label="t('library.column.archived')"
               column="archived"
               class="hide-narrow"
               :sort-key="sort.key"
               :sort-dir="sort.dir"
               @sort="sortBy"
             />
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
+            <th scope="col">
+              <span class="visually-hidden">{{ t('library.column.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -485,17 +540,24 @@ watch(planner.libraryVersion, load)
               <StarToggle :starred="r.favorite" :label="r.name" @toggle="toggleFavorite(r)" />
             </td>
             <td class="name-cell">
-              <button type="button" class="name" :title="`Open ${r.name} in the planner`" @click="open(r.id)">
+              <button
+                type="button"
+                class="name"
+                :title="t('library.row.open', { name: r.name })"
+                @click="open(r.id)"
+              >
                 {{ r.name }}
               </button>
             </td>
-            <td class="num">{{ km(r.distance) }} km</td>
-            <td class="num">{{ Math.round(r.ascent) }} m</td>
+            <td class="num">{{ km(r.distance) }} {{ t('common.unit.km') }}</td>
+            <td class="num">{{ num(Math.round(r.ascent)) }} {{ t('common.unit.m') }}</td>
             <td class="hide-narrow">{{ day(r.archivedAt) }}</td>
             <td class="actions">
-              <button type="button" @click="open(r.id)">Open</button>
-              <button type="button" @click="unarchive(r)">Unarchive</button>
-              <IconButton :label="`Move ${r.name} to the trash`" @click="moveToTrash(r)">✕</IconButton>
+              <button type="button" @click="open(r.id)">{{ t('common.action.open') }}</button>
+              <button type="button" @click="unarchive(r)">{{ t('common.action.unarchive') }}</button>
+              <IconButton :label="t('library.row.trash', { name: r.name })" @click="moveToTrash(r)"
+                >✕</IconButton
+              >
             </td>
           </tr>
         </tbody>
@@ -503,14 +565,16 @@ watch(planner.libraryVersion, load)
     </template>
 
     <template v-else>
-      <p class="empty">Deleted routes stay here until you restore them or empty the trash.</p>
+      <p class="empty">{{ t('library.trashIntro') }}</p>
       <table v-if="trash.length" class="routes">
         <thead>
           <tr>
-            <th scope="col">Name</th>
-            <th scope="col" class="num">Distance</th>
-            <th scope="col" class="hide-narrow">Deleted</th>
-            <th scope="col"><span class="visually-hidden">Actions</span></th>
+            <th scope="col">{{ t('library.column.name') }}</th>
+            <th scope="col" class="num">{{ t('library.column.distance') }}</th>
+            <th scope="col" class="hide-narrow">{{ t('library.column.deleted') }}</th>
+            <th scope="col">
+              <span class="visually-hidden">{{ t('library.column.actions') }}</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -518,17 +582,19 @@ watch(planner.libraryVersion, load)
             <td class="name-cell">
               <span class="name static">{{ r.name }}</span>
             </td>
-            <td class="num">{{ km(r.distance) }} km</td>
+            <td class="num">{{ km(r.distance) }} {{ t('common.unit.km') }}</td>
             <td class="hide-narrow">{{ day(r.deletedAt) }}</td>
             <td class="actions">
-              <button type="button" @click="restore(r)">Restore</button>
-              <button type="button" class="danger" @click="deleteForever(r)">Delete for good</button>
+              <button type="button" @click="restore(r)">{{ t('common.action.restore') }}</button>
+              <button type="button" class="danger" @click="deleteForever(r)">
+                {{ t('library.confirm.deleteForever.confirm') }}
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
       <button v-if="trash.length" type="button" class="danger empty-trash" @click="emptyTrash">
-        Empty trash
+        {{ t('library.confirm.emptyTrash.confirm') }}
       </button>
     </template>
 

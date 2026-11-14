@@ -33,7 +33,7 @@ class SchemaTest {
                     "SELECT version FROM flyway_schema_history WHERE success = 1 ORDER BY installed_rank")
                 .query(String.class)
                 .list())
-        .containsExactly("1", "2", "3", "4", "5");
+        .containsExactly("1", "2", "3", "4", "5", "6");
     assertThat(jdbc.sql("PRAGMA journal_mode").query(String.class).single()).isEqualTo("wal");
   }
 

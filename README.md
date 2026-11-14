@@ -12,6 +12,7 @@ ELEMNT BOLT. It also plans road-bike rides and horseback rides.
   (mtb:scale S0 green, S1 blue, S2 red, S3+ black), unrated ones dashed brown, ways closed to bikes
   dotted grey. Trails harder than the riding style allows are faded. Pointing at a path or road
   shows its name, type, difficulty, surface and bike access.
+- In English, French and German (switch in the header; the browser's language by default).
 - Shows distance, climbing, estimated time, an elevation profile and a way-type/surface breakdown.
 - Saves routes in a library (SQLite) and exports GPX for the BOLT.
 - Imports the rides the BOLT recorded (Rides): distance, moving time, climbing, speed, heart rate

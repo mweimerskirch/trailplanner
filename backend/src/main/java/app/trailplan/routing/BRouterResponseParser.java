@@ -101,11 +101,12 @@ public final class BRouterResponseParser {
     if (lngCol < 0 || latCol < 0 || tagsCol < 0) {
       return warnings;
     }
-    String previous = null;
+    RouteWarning.Reason previous = null;
     for (int i = 1; i < messages.size(); i++) {
       JsonNode row = messages.get(i);
-      String reason = RouteWarning.reasonFor(parseTags(row.path(tagsCol).asString("")), activity);
-      if (reason != null && !reason.equals(previous)) {
+      RouteWarning.Reason reason =
+          RouteWarning.restriction(parseTags(row.path(tagsCol).asString("")), activity);
+      if (reason != null && reason != previous) {
         warnings.add(
             new RouteWarning(
                 row.path(lngCol).asDouble() / 1_000_000,

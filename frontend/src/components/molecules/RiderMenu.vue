@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, useTemplateRef, watch } from 'vue'
+import { useI18n } from 'vue-i18n'
 import { RouterLink, useRoute } from 'vue-router'
 import Avatar from '@/components/atoms/Avatar.vue'
 import type { Rider } from '@/types'
@@ -8,6 +9,7 @@ import type { Rider } from '@/types'
 defineProps<{ rider: Rider }>()
 
 const route = useRoute()
+const { t } = useI18n()
 const open = ref(false)
 const root = useTemplateRef<HTMLElement>('root')
 
@@ -43,10 +45,16 @@ onBeforeUnmount(() => {
     </button>
     <div v-if="open" class="dropdown" role="menu">
       <p class="signed-in">
-        Planning as <b>{{ rider.name }}</b>
+        <i18n-t keypath="riders.menu.planningAs" scope="global">
+          <template #name>
+            <b>{{ rider.name }}</b>
+          </template>
+        </i18n-t>
       </p>
-      <RouterLink to="/riders" role="menuitem">Switch rider</RouterLink>
-      <RouterLink :to="{ path: '/riders', query: { manage: '1' } }" role="menuitem">Manage riders</RouterLink>
+      <RouterLink to="/riders" role="menuitem">{{ t('riders.menu.switch') }}</RouterLink>
+      <RouterLink :to="{ path: '/riders', query: { manage: '1' } }" role="menuitem">{{
+        t('riders.manage')
+      }}</RouterLink>
     </div>
   </div>
 </template>

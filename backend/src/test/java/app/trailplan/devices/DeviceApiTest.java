@@ -39,4 +39,24 @@ class DeviceApiTest {
         .contains("\"title\":\"Copy over USB\"")
         .doesNotContain("cloud");
   }
+
+  @Test
+  void devicesSpeakTheLanguageOfTheUi() throws Exception {
+    TestHttp http = new TestHttp(port);
+    http.chooseNewRider("Polyglot");
+
+    assertThat(http.inLanguage("fr").get("/api/devices").body())
+        .contains("\"title\":\"Copier par USB\"")
+        .contains("\"name\":\"Autre appareil ou application\"")
+        .contains("\"label\":\"parcours FIT\"")
+        .contains("supprimez-les aussi sur l’appareil");
+    assertThat(http.inLanguage("de-DE,de;q=0.9").get("/api/devices").body())
+        .contains("\"title\":\"Über USB kopieren\"");
+    // English, and any language without translations, get the texts from the code.
+    for (String language : new String[] {"en", "es"}) {
+      assertThat(http.inLanguage(language).get("/api/devices").body())
+          .contains("\"title\":\"Copy over USB\"")
+          .contains("\"name\":\"Wahoo ELEMNT (BOLT, ROAM, ACE)\"");
+    }
+  }
 }

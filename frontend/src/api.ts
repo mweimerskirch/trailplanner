@@ -23,6 +23,7 @@ import type {
 } from './types'
 import type { Geometry } from 'geojson'
 import type { Bounds } from './search'
+import { currentLocale, t } from './i18n'
 
 export class ApiError extends Error {
   constructor(
@@ -45,10 +46,11 @@ interface ProblemDetail {
 async function toError(response: Response): Promise<ApiError> {
   try {
     const problem = (await response.json()) as ProblemDetail
-    const message = problem.detail ?? problem.title ?? `Request failed (${response.status})`
+    const message =
+      problem.detail ?? problem.title ?? t('common.error.requestFailed', { status: response.status })
     return new ApiError(message, response.status, problem.reason ?? null)
   } catch {
-    return new ApiError(`Request failed (${response.status})`, response.status)
+    return new ApiError(t('common.error.requestFailed', { status: response.status }), response.status)
   }
 }
 
@@ -74,6 +76,8 @@ async function send(path: string, init: RequestInit = {}, signal?: AbortSignal):
   // The server only accepts changes with this header (protection against other websites).
   headers.set('X-Trailplan-Client', 'web')
   if (riderHeader !== null) headers.set('X-Trailplan-Rider', riderHeader)
+  // The server localises its texts (device instructions, built-in presets of a new rider).
+  headers.set('Accept-Language', currentLocale())
   // FormData bodies (file uploads) need the browser's multipart Content-Type with its boundary.
   if (!headers.has('Content-Type') && !(init.body instanceof FormData)) {
     headers.set('Content-Type', 'application/json')
@@ -84,7 +88,7 @@ async function send(path: string, init: RequestInit = {}, signal?: AbortSignal):
     response = await fetch(path, { ...init, ...(signal ? { signal } : {}), headers })
   } catch (error) {
     if (error instanceof DOMException && error.name === 'AbortError') throw error
-    throw new ApiError('The Trailplan server is not reachable.', 0)
+    throw new ApiError(t('common.error.unreachable'), 0)
   }
   if (!response.ok) {
     const error = await toError(response)
@@ -382,6 +386,7 @@ export async function searchPlaces(query: string, area?: Bounds): Promise<Place[
     q: query,
     polygon_geojson: '1',
     polygon_threshold: '0.00005',
+    'accept-language': currentLocale(), // place names in the app's language, where OSM has them
   })
   if (area) {
     params.set('viewbox', [area.west, area.north, area.east, area.south].map((v) => v.toFixed(5)).join(','))
@@ -389,7 +394,7 @@ export async function searchPlaces(query: string, area?: Bounds): Promise<Place[
   }
   const url = `https://nominatim.openstreetmap.org/search?${params.toString()}`
   const response = await fetch(url, { headers: { Accept: 'application/json' } })
-  if (!response.ok) throw new ApiError('Place search is unavailable right now.', response.status)
+  if (!response.ok) throw new ApiError(t('common.error.placeSearch'), response.status)
   const results = (await response.json()) as NominatimResult[]
   return results.map((r) => {
     const box = r.boundingbox?.map(Number)

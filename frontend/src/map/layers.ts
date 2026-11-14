@@ -1,3 +1,4 @@
+import { t } from '@/i18n'
 import type { ExpressionSpecification, Map as MapLibreMap, RasterSourceSpecification } from 'maplibre-gl'
 
 /** Free vector base map (no API key). Raster maps below are drawn on top of it when chosen. */
@@ -9,47 +10,45 @@ export type BaseMapId = 'vector' | 'cyclosm' | 'topo' | 'satellite'
 
 export interface BaseMap {
   id: BaseMapId
-  label: string
+  /** In the chosen language; read it when rendering (a getter, so it follows a language change). */
+  readonly label: string
   source?: RasterSourceSpecification
 }
 
+/** The label is a getter, so the list defined at module load still follows the language. */
+function baseMap(id: BaseMapId, label: () => string, source?: RasterSourceSpecification): BaseMap {
+  return {
+    id,
+    get label() {
+      return label()
+    },
+    ...(source ? { source } : {}),
+  }
+}
+
 export const BASE_MAPS: readonly BaseMap[] = [
-  { id: 'vector', label: 'Standard' },
-  {
-    id: 'cyclosm',
-    label: 'CyclOSM (trails)',
-    source: {
-      type: 'raster',
-      tiles: ['a', 'b', 'c'].map((s) => `https://${s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png`),
-      tileSize: 256,
-      maxzoom: 20,
-      attribution: `${OSM}, style <a href="https://www.cyclosm.org">CyclOSM</a>`,
-    },
-  },
-  {
-    id: 'topo',
-    label: 'OpenTopoMap',
-    source: {
-      type: 'raster',
-      tiles: ['a', 'b', 'c'].map((s) => `https://${s}.tile.opentopomap.org/{z}/{x}/{y}.png`),
-      tileSize: 256,
-      maxzoom: 17,
-      attribution: `${OSM}, SRTM, style © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)`,
-    },
-  },
-  {
-    id: 'satellite',
-    label: 'Satellite',
-    source: {
-      type: 'raster',
-      tiles: [
-        'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-      ],
-      tileSize: 256,
-      maxzoom: 19,
-      attribution: 'Imagery © Esri',
-    },
-  },
+  baseMap('vector', () => t('map.layers.standard')),
+  baseMap('cyclosm', () => t('map.layers.cyclosm'), {
+    type: 'raster',
+    tiles: ['a', 'b', 'c'].map((s) => `https://${s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png`),
+    tileSize: 256,
+    maxzoom: 20,
+    attribution: `${OSM}, style <a href="https://www.cyclosm.org">CyclOSM</a>`,
+  }),
+  baseMap('topo', () => 'OpenTopoMap', {
+    type: 'raster',
+    tiles: ['a', 'b', 'c'].map((s) => `https://${s}.tile.opentopomap.org/{z}/{x}/{y}.png`),
+    tileSize: 256,
+    maxzoom: 17,
+    attribution: `${OSM}, SRTM, style © <a href="https://opentopomap.org">OpenTopoMap</a> (CC-BY-SA)`,
+  }),
+  baseMap('satellite', () => t('map.layers.satellite'), {
+    type: 'raster',
+    tiles: ['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+    tileSize: 256,
+    maxzoom: 19,
+    attribution: 'Imagery © Esri',
+  }),
 ]
 
 export const MTB_OVERLAY: RasterSourceSpecification = {

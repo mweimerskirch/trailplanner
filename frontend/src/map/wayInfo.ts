@@ -3,57 +3,23 @@ import type { GeoJSONSource, Map as MapLibreMap, MapGeoJSONFeature, MapMouseEven
 
 type Position = number[]
 import type { Activity } from '@/types'
+import { i18n, t } from '@/i18n'
 import { TRAIL_COLORS } from './trails'
 
 /**
  * Hover info for the ways in the vector tiles (OpenMapTiles "transportation" layer): name, type,
- * difficulty, surface, bike access. The tiles carry nothing more (no tracktype, smoothness or
+ * difficulty, surface, bike access, in the chosen language (OSM values without a translation are
+ * shown as they are). The tiles carry nothing more (no tracktype, smoothness or
  * width).
  */
 
 type Props = Record<string, unknown>
 
-const SUBCLASS_LABELS: Record<string, string> = {
-  path: 'Path',
-  footway: 'Footway',
-  cycleway: 'Cycleway',
-  bridleway: 'Bridleway',
-  steps: 'Steps',
-  pedestrian: 'Pedestrian area',
-  platform: 'Platform',
-  corridor: 'Corridor',
+/** The translation of an OSM value under a message group, or null if there is none. */
+function label(group: string, value: string): string | null {
+  const key = `map.way.${group}.${value}`
+  return i18n.global.te(key) ? t(key) : null
 }
-
-const CLASS_LABELS: Record<string, string> = {
-  track: 'Track',
-  service: 'Service road',
-  minor: 'Minor road',
-  tertiary: 'Tertiary road',
-  secondary: 'Secondary road',
-  primary: 'Primary road',
-  trunk: 'Trunk road',
-  motorway: 'Motorway',
-  busway: 'Busway',
-  raceway: 'Raceway',
-}
-
-const SERVICE_LABELS: Record<string, string> = {
-  driveway: 'driveway',
-  parking_aisle: 'parking aisle',
-  alley: 'alley',
-  drive_through: 'drive-through',
-}
-
-const BIKE_LABELS: Record<string, string> = {
-  no: 'not allowed',
-  dismount: 'dismount',
-  yes: 'allowed',
-  permissive: 'allowed (permissive)',
-  designated: 'designated',
-  private: 'private',
-}
-
-const ACCESS_LABELS: Record<string, string> = { no: 'no access', private: 'private' }
 
 const text = (value: unknown): string | null =>
   typeof value === 'string' && value !== '' ? value : typeof value === 'number' ? String(value) : null
@@ -71,14 +37,14 @@ export function wayType(props: Props): string | null {
   if (!cls) return null
   const construction = cls.endsWith('_construction')
   const base = construction ? cls.slice(0, -'_construction'.length) : cls
-  let label: string | undefined
-  if (base === 'path') label = SUBCLASS_LABELS[text(props.subclass) ?? 'path'] ?? 'Path'
-  else label = CLASS_LABELS[base]
-  if (!label) return null
+  let type: string | null
+  if (base === 'path') type = label('subclass', text(props.subclass) ?? 'path') ?? t('map.way.subclass.path')
+  else type = label('class', base)
+  if (!type) return null
   const service = text(props.service)
-  const serviceLabel = service ? SERVICE_LABELS[service] : undefined
-  if (serviceLabel) label += ` (${serviceLabel})`
-  return construction ? `${label}, under construction` : label
+  const serviceLabel = service ? label('service', service) : null
+  if (serviceLabel) type = t('map.way.withService', { type, service: serviceLabel })
+  return construction ? t('map.way.construction', { type }) : type
 }
 
 export function gradeColor(grade: number): string {
@@ -97,24 +63,26 @@ export function describeWay(props: Props, name: string | null, activity: Activit
   if (scale) {
     const grade = Number.parseInt(scale, 10)
     rows.push({
-      label: 'Difficulty',
+      label: t('map.way.row.difficulty'),
       value: `S${scale}`,
       color: Number.isNaN(grade) ? undefined : gradeColor(grade),
     })
   }
   const surface = text(props.surface)
-  if (surface) rows.push({ label: 'Surface', value: surface })
+  if (surface) rows.push({ label: t('map.way.row.surface'), value: label('surface', surface) ?? surface })
   const bicycle = text(props.bicycle)
   // The tiles have no horse tag; bike access says nothing about horses.
-  if (bicycle && activity !== 'HORSE') rows.push({ label: 'Bikes', value: BIKE_LABELS[bicycle] ?? bicycle })
+  if (bicycle && activity !== 'HORSE')
+    rows.push({ label: t('map.way.row.bikes'), value: label('bicycle', bicycle) ?? bicycle })
   const access = text(props.access)
-  if (access && access !== 'yes') rows.push({ label: 'Access', value: ACCESS_LABELS[access] ?? access })
+  if (access && access !== 'yes')
+    rows.push({ label: t('map.way.row.access'), value: label('access', access) ?? access })
   const brunnel = text(props.brunnel)
   const extras = [
-    brunnel === 'bridge' ? 'bridge' : brunnel === 'tunnel' ? 'tunnel' : brunnel === 'ford' ? 'ford' : null,
-    props.oneway === 1 || props.oneway === -1 ? 'one-way' : null,
+    brunnel === 'bridge' || brunnel === 'tunnel' || brunnel === 'ford' ? t(`map.way.extra.${brunnel}`) : null,
+    props.oneway === 1 || props.oneway === -1 ? t('map.way.extra.oneway') : null,
   ].filter((x): x is string => x !== null)
-  if (extras.length) rows.push({ label: 'Note', value: extras.join(', ') })
+  if (extras.length) rows.push({ label: t('map.way.row.note'), value: extras.join(', ') })
   return name ? { title: name, type, rows } : { title: type, type: null, rows }
 }
 

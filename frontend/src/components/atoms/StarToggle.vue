@@ -1,9 +1,11 @@
 <script setup lang="ts">
 /** Star / unstar (favorite). `label` names the thing being starred for screen readers. */
+import { useI18n } from 'vue-i18n'
+
 const props = defineProps<{ starred: boolean; label: string }>()
 defineEmits<{ toggle: [] }>()
-const title = () =>
-  props.starred ? `Remove ${props.label} from favorites` : `Add ${props.label} to favorites`
+const { t } = useI18n()
+const title = () => t(props.starred ? 'library.star.remove' : 'library.star.add', { name: props.label })
 </script>
 
 <template>
