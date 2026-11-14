@@ -3,6 +3,8 @@
 A self-hosted mountain-bike route planner on OpenStreetMap data. It also plans road-bike rides and
 horseback rides. Routes go to a Wahoo ELEMNT over USB, or as GPX and FIT files to any device or app.
 
+![The planner: a 26 km mountain-bike loop with its way types, surfaces and elevation profile, on a map with the trail overlay](docs/screenshot.jpg)
+
 - Click the map to set points, drag points to move them, drag the route line to add a via point.
 - Routing prefers the way types you choose (singletrails, forest tracks, roads …), respects a
   maximum trail difficulty (`mtb:scale`) and can prefer riding through woods.
